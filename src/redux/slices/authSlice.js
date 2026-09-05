@@ -1,0 +1,4 @@
+// isAuthenticated
+// token
+// firebaseUser
+// loading

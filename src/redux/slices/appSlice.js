@@ -1,0 +1,4 @@
+// isLoading
+// maintenanceMode
+// appVersion
+// networkStatus
