@@ -15,7 +15,7 @@ export default function LoginScreen({navigation}) {
       return;
     }
     setError('');
-    Alert.alert('Coming soon', 'Phone verification will be available soon. No OTP has been sent.');
+    navigation.navigate('OTP', {phone});
   };
   return <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
     <StatusBar barStyle="light-content" />
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   phoneField: {marginTop: 36}, prefix: {flexDirection: 'row', alignItems: 'center'},
   flag: {fontSize: 22, marginRight: 8}, countryCode: {fontFamily: 'Poppins-Medium', fontSize: 16, color: '#F6F3FA'},
   divider: {width: 1, height: 22, backgroundColor: '#48414F', marginHorizontal: 12},
-  sendButton: {marginTop: 30},
+  sendButton: {marginTop: 30, width: '100%', alignSelf: 'stretch'},
   terms: {textAlign: 'center', color: '#A8A0B7', fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 19, marginTop: 34}, termsHighlight: {color: '#DBCEFA'},
   art: {flex: 1, justifyContent: 'flex-end', marginTop: 30, overflow: 'hidden'},
 });
