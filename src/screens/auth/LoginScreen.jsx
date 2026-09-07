@@ -1,21 +1,43 @@
-﻿import React, {useState} from 'react';
-import {Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import Svg, {Path} from 'react-native-svg';
+﻿import React, { useState } from 'react';
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 import AppButton from '../../components/ui/AppButton';
 import AppInput from '../../components/ui/AppInput';
 import ProfileBubbles from '../../components/auth/ProfileBubbles';
+import { sendPhoneOTP } from '../../services/authService';
 
-export default function LoginScreen({navigation}) {
+export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
-  const sendOTP = () => {
+  const [sending, setSending] = useState(false);
+
+
+  const sendOTP = async () => {
+
+    if (sending) {
+      return;
+    }
+
     if (!/^[6-9]\d{9}$/.test(phone)) {
       setError('Enter a valid 10-digit Indian mobile number.');
       return;
     }
+    Keyboard.dismiss();
+    setSending(true);
     setError('');
-    navigation.navigate('OTP', {phone});
+
+    try {
+      await sendPhoneOTP(phone);
+      navigation.navigate('OTP', { phone });
+
+    } catch (error) {
+      const message = error.message || 'Unable to send OTP. Please try again.';
+      setError(message);
+      Alert.alert('Unable to send OTP', message);
+    } finally {
+      setSending(false);
+    }
   };
   return <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
     <StatusBar barStyle="light-content" />
@@ -27,11 +49,11 @@ export default function LoginScreen({navigation}) {
           </Pressable>
           <Text style={styles.heading}>Enter Your{'\n'}Mobile Number</Text>
           <Text style={styles.description}>We'll send you a one-time password{'\n'}(OTP) to verify your number.</Text>
-          <AppInput containerStyle={styles.phoneField} accessibilityLabel="Mobile number" placeholder="98765 43210" value={phone}
-            onChangeText={value => {setPhone(value.replace(/\D/g, '').slice(0, 10)); setError('');}}
+          <AppInput containerStyle={styles.phoneField} accessibilityLabel="Mobile number" placeholder="98765 43210" value={phone} editable={!sending}
+            onChangeText={value => { setPhone(value.replace(/\D/g, '').slice(0, 10)); setError(''); }}
             keyboardType="phone-pad" autoComplete="tel-national" textContentType="telephoneNumber" returnKeyType="done" onSubmitEditing={sendOTP} error={error}
             leading={<View style={styles.prefix}><Text style={styles.flag}>🇮🇳</Text><Text style={styles.countryCode}>+91</Text><View style={styles.divider} /></View>} />
-          <AppButton title="Send OTP" onPress={sendOTP} style={styles.sendButton} />
+          <AppButton title="Send OTP" onPress={sendOTP} loading={sending} disabled={sending} style={styles.sendButton} />
           <Text style={styles.terms}>By continuing, you agree to our{'\n'}<Text style={styles.termsHighlight}>Terms & Privacy Policy</Text></Text>
         </View>
         <View style={styles.art}><ProfileBubbles /></View>
@@ -40,16 +62,18 @@ export default function LoginScreen({navigation}) {
   </SafeAreaView>;
 }
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: '#09080F'}, flex: {flex: 1}, content: {flexGrow: 1},
-  form: {paddingHorizontal: 24, width: '100%', maxWidth: 460, alignSelf: 'center'},
-  back: {width: 44, height: 44, justifyContent: 'center', marginTop: 4, marginBottom: 4},
-  heading: {fontFamily: 'Poppins-SemiBold', fontSize: 28, lineHeight: 36, color: '#F7F5FA'},
-  description: {fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 23, color: '#C4BECD', marginTop: 14},
-  phoneField: {marginTop: 36}, prefix: {flexDirection: 'row', alignItems: 'center'},
-  flag: {fontSize: 22, marginRight: 8}, countryCode: {fontFamily: 'Poppins-Medium', fontSize: 16, color: '#F6F3FA'},
-  divider: {width: 1, height: 22, backgroundColor: '#48414F', marginHorizontal: 12},
-  sendButton: {marginTop: 30, width: '100%', alignSelf: 'stretch'},
-  terms: {textAlign: 'center', color: '#A8A0B7', fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 19, marginTop: 34}, termsHighlight: {color: '#DBCEFA'},
-  art: {flex: 1, justifyContent: 'flex-end', marginTop: 30, overflow: 'hidden'},
+  screen: { flex: 1, backgroundColor: '#09080F' }, flex: { flex: 1 }, content: { flexGrow: 1 },
+  form: { paddingHorizontal: 24, width: '100%', maxWidth: 460, alignSelf: 'center' },
+  back: { width: 44, height: 44, justifyContent: 'center', marginTop: 4, marginBottom: 4 },
+  heading: { fontFamily: 'Poppins-SemiBold', fontSize: 28, lineHeight: 36, color: '#F7F5FA' },
+  description: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 23, color: '#C4BECD', marginTop: 14 },
+  phoneField: { marginTop: 36 }, prefix: { flexDirection: 'row', alignItems: 'center' },
+  flag: { fontSize: 22, marginRight: 8 }, countryCode: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#F6F3FA' },
+  divider: { width: 1, height: 22, backgroundColor: '#48414F', marginHorizontal: 12 },
+  sendButton: { marginTop: 30, width: '100%', alignSelf: 'stretch' },
+  terms: { textAlign: 'center', color: '#A8A0B7', fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 19, marginTop: 34 }, termsHighlight: { color: '#DBCEFA' },
+  art: { flex: 1, justifyContent: 'flex-end', marginTop: 30, overflow: 'hidden' },
 });
+
+
 

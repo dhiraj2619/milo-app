@@ -1,14 +1,18 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Alert, Pressable, StatusBar, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Alert, Keyboard, Pressable, StatusBar, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg, {Path} from 'react-native-svg';
 import AppButton from '../../components/ui/AppButton';
 import ProfileBubbles from '../../components/auth/ProfileBubbles';
+import {sendPhoneOTP, verifyPhoneOTP} from '../../services/authService';
 
 const OTP_LENGTH = 6;
 
 export default function OTPScreen({navigation, route}) {
-  const phone = route?.params?.phone || '98765 43210';
+  const phone = route?.params?.phone || '';
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
+  const busy = useRef(false);
   const [code, setCode] = useState(Array(OTP_LENGTH).fill(''));
   const [secondsLeft, setSecondsLeft] = useState(58);
   const inputRefs = useRef([]);
@@ -22,12 +26,16 @@ export default function OTPScreen({navigation, route}) {
   }, [secondsLeft]);
 
   const updateCode = (value, index) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
+    const digits = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
     const nextCode = [...code];
-    nextCode[index] = digit;
+    const start = digits.length === OTP_LENGTH ? 0 : index;
+    if (!digits) { nextCode[index] = ''; }
+    digits.split('').forEach((digit, offset) => {
+      if (start + offset < OTP_LENGTH) { nextCode[start + offset] = digit; }
+    });
     setCode(nextCode);
-    if (digit && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
+    if (digits) {
+      inputRefs.current[Math.min(start + digits.length, OTP_LENGTH - 1)]?.focus();
     }
   };
 
@@ -37,18 +45,53 @@ export default function OTPScreen({navigation, route}) {
     }
   };
 
-  const resendOTP = () => {
-    setCode(Array(OTP_LENGTH).fill(''));
-    setSecondsLeft(58);
-    inputRefs.current[0]?.focus();
+  const resendOTP = async () => {
+    if (busy.current || secondsLeft > 0) { return; }
+    if (!phone) {
+      Alert.alert('Missing phone number', 'Go back and enter your mobile number.');
+      return;
+    }
+    busy.current = true;
+    setResending(true);
+    try {
+      await sendPhoneOTP(phone);
+      setCode(Array(OTP_LENGTH).fill(''));
+      setSecondsLeft(58);
+      inputRefs.current[0]?.focus();
+    } catch (error) {
+      Alert.alert('Unable to resend OTP', error.message || 'Please try again.');
+    } finally {
+      busy.current = false;
+      setResending(false);
+    }
   };
 
-  const verifyOTP = () => {
-    if (code.join('').length !== OTP_LENGTH) {
+  const verifyOTP = async () => {
+    if (busy.current) { return; }
+    if (!/^\d{6}$/.test(code.join(''))) {
       Alert.alert('Incomplete OTP', 'Please enter the 6-digit OTP to continue.');
       return;
     }
-    Alert.alert('Coming soon', 'OTP verification will be available soon.');
+    busy.current = true;
+    setVerifying(true);
+    Keyboard.dismiss();
+    try {
+      const result = await verifyPhoneOTP(code.join(''), phone);
+      navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
+      if (result.isNewUser) {
+        Alert.alert('Phone verified', 'Your phone is verified. Profile setup is still needed to create your Milo account.');
+      }
+    } catch (error) {
+      const messages = {
+        'auth/invalid-verification-code': 'That code is incorrect. Check the OTP and try again.',
+        'auth/session-expired': 'This OTP has expired. Request a new code.',
+        'auth/too-many-requests': 'Too many attempts. Please wait before trying again.',
+      };
+      Alert.alert('Verification failed', messages[error.code] || error.response?.data?.message || error.message || 'Please try again.');
+    } finally {
+      busy.current = false;
+      setVerifying(false);
+    }
   };
 
   return (
@@ -70,7 +113,10 @@ export default function OTPScreen({navigation, route}) {
               onChangeText={value => updateCode(value, index)}
               onKeyPress={event => handleKeyPress(event, index)}
               keyboardType="number-pad"
-              maxLength={1}
+              maxLength={OTP_LENGTH}
+              editable={!verifying && !resending}
+              textContentType="oneTimeCode"
+              autoComplete={index === 0 ? 'sms-otp' : 'off'}
               selectTextOnFocus
               textAlign="center"
               style={[styles.otpInput, digit && styles.otpInputFilled]}
@@ -80,12 +126,12 @@ export default function OTPScreen({navigation, route}) {
 
           <View style={styles.resendRow}>
             <Text style={styles.resendText}>Didn&apos;t receive the code? </Text>
-            <Pressable disabled={secondsLeft > 0} onPress={resendOTP}>
-              <Text style={styles.resendLink}>Resend OTP</Text>
+            <Pressable disabled={secondsLeft > 0 || verifying || resending} onPress={resendOTP}>
+              <Text style={styles.resendLink}>{resending ? 'Sending...' : 'Resend OTP'}</Text>
             </Pressable>
           </View>
           <View style={styles.timerRow}><Text style={styles.clock}>◷</Text><Text style={styles.timer}>00:{String(secondsLeft).padStart(2, '0')}</Text></View>
-          <AppButton title="Verify" onPress={verifyOTP} style={styles.verifyButton} />
+          <AppButton title="Verify" onPress={verifyOTP} loading={verifying} disabled={verifying || resending} style={styles.verifyButton} />
         </View>
         <View style={styles.art}><ProfileBubbles /></View>
       </View>

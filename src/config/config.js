@@ -1,0 +1,1 @@
+export const SERVER_URL = 'https://milo-server-uvr2.onrender.com/';
