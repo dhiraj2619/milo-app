@@ -59,5 +59,3 @@ const styles = StyleSheet.create({
   text: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#FFFFFF' },
   dim: { opacity: 0.6 },
 });
-
-

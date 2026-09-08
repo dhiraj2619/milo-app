@@ -5,10 +5,12 @@ import Svg, {Path} from 'react-native-svg';
 import AppButton from '../../components/ui/AppButton';
 import ProfileBubbles from '../../components/auth/ProfileBubbles';
 import {sendPhoneOTP, verifyPhoneOTP} from '../../services/authService';
+import {useToast} from '../../components/ui/ToastProvider';
 
 const OTP_LENGTH = 6;
 
 export default function OTPScreen({navigation, route}) {
+  const toast = useToast();
   const phone = route?.params?.phone || '';
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
@@ -77,9 +79,11 @@ export default function OTPScreen({navigation, route}) {
     Keyboard.dismiss();
     try {
       const result = await verifyPhoneOTP(code.join(''), phone);
-      navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
-      if (result.isNewUser) {
-        Alert.alert('Phone verified', 'Your phone is verified. Profile setup is still needed to create your Milo account.');
+      toast('OTP verified successfully');
+      if (result.isNewUser || !result.user?.nickname || !result.user?.gender || !result.user?.languages?.length) {
+        navigation.replace('ProfileSetup', {profile: result.user || null});
+      } else {
+        navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
       }
     } catch (error) {
       const messages = {
