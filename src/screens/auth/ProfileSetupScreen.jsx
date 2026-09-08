@@ -4,7 +4,6 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg, {Circle, Path} from 'react-native-svg';
 import AppButton from '../../components/ui/AppButton';
 import AppInput from '../../components/ui/AppInput';
-import {useToast} from '../../components/ui/ToastProvider';
 import {completeProfile} from '../../services/authService';
 
 const LANGUAGES = ['Hindi', 'Marathi', 'English', 'Bengali', 'Tamil', 'Telugu', 'Kannada', 'Gujarati', 'Malayalam', 'Punjabi', 'Urdu', 'Odia', 'Assamese'];
@@ -27,7 +26,6 @@ export default function ProfileSetupScreen({navigation, route}) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const busy = useRef(false);
-  const toast = useToast();
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -55,8 +53,7 @@ export default function ProfileSetupScreen({navigation, route}) {
     setSaving(true);
     try {
       await completeProfile({nickname: nickname.trim(), gender, languages});
-      toast('Profile completed successfully');
-      navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
+      navigation.reset({index: 0, routes: [{name: 'ProfileSuccess'}]});
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Unable to save your profile. Please try again.');
     } finally {busy.current = false; setSaving(false);}

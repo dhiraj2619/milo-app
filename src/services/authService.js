@@ -11,9 +11,9 @@ export async function completeProfile({nickname, gender, languages}) {
   const user = getAuth().currentUser;
   if (!user) {throw new Error('Please sign in again to complete your profile.');}
   const idToken = await getIdToken(user);
-  const response = await api.post('/auth/firebase/verify-token', {idToken, nickname, gender, languages});
+  const response = await api.post('/users/profile', {idToken, nickname, gender, languages});
   const profile = response.data.data?.user;
-  if (!response.data.success || !profile || profile.nickname !== nickname || profile.gender !== gender || !languages.every(language => profile.languages?.includes(language))) {
+  if (!response.data.success || !profile?._id || profile.firebaseUid !== user.uid || profile.nickname !== nickname || profile.gender !== gender || !languages.every(language => profile.languages?.includes(language))) {
     throw new Error('Your profile could not be saved completely. Please try again.');
   }
   return profile;
