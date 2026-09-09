@@ -80,7 +80,7 @@ export default function OTPScreen({navigation, route}) {
     try {
       const result = await verifyPhoneOTP(code.join(''), phone);
       toast('OTP verified successfully');
-      if (result.isNewUser || !result.user?.nickname || !result.user?.gender || !result.user?.languages?.length) {
+      if (result.profileCompleted !== true || !result.user?._id || !result.user?.nickname || !result.user?.gender || !result.user?.languages?.length) {
         navigation.replace('ProfileSetup', {profile: result.user || null});
       } else {
         navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
