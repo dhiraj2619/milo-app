@@ -11,11 +11,18 @@ import api from './api';
 let pendingConfirmation = null;
 let pendingPhone = null;
 
-export async function completeProfile({nickname, gender, languages}) {
+function phoneAuthMessage(error) {
+  if (error?.code === 'auth/network-request-failed') {
+    return 'Firebase could not reach phone verification. Check the app SHA fingerprint in Firebase Console, then try again.';
+  }
+  return error?.message || 'Unable to send OTP. Please try again.';
+}
+
+export async function completeProfile({nickname, gender, languages, avatarSeed, avatarStyle}) {
   const user = getAuth().currentUser;
   if (!user) {throw new Error('Please sign in again to complete your profile.');}
   const idToken = await getIdToken(user);
-  const response = await api.post('/users/profile', {idToken, nickname, gender, languages});
+  const response = await api.post('/users/profile', {idToken, nickname, gender, languages, avatarSeed, avatarStyle});
   const profile = response.data.data?.user;
   if (!response.data.success || !profile?._id || profile.profileCompleted !== true || profile.firebaseUid !== user.uid || profile.nickname !== nickname || profile.gender !== gender || !languages.every(language => profile.languages?.includes(language))) {
     throw new Error('Your profile could not be saved completely. Please try again.');
@@ -26,9 +33,13 @@ export async function completeProfile({nickname, gender, languages}) {
 export async function sendPhoneOTP(phone) {
   pendingConfirmation = null;
   pendingPhone = null;
-  if (getAuth().currentUser) {await signOut(getAuth());}
-  pendingConfirmation = await signInWithPhoneNumber(getAuth(), `+91${phone}`);
-  pendingPhone = phone;
+  try {
+    if (getAuth().currentUser) {await signOut(getAuth());}
+    pendingConfirmation = await signInWithPhoneNumber(getAuth(), `+91${phone}`);
+    pendingPhone = phone;
+  } catch (error) {
+    throw new Error(phoneAuthMessage(error));
+  }
 }
 
 export async function verifyPhoneOTP(otp, phone) {

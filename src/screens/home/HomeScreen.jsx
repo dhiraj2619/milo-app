@@ -1,4 +1,4 @@
-﻿import React, { useId, useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -8,154 +8,205 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import {
   Bell,
   Check,
   ChevronRight,
   Clock3,
-  Crown,
   House,
   MapPin,
   MessageCircle,
   Phone,
   Plus,
+  Sparkles,
   Star,
   UserRound,
 } from 'lucide-react-native';
+import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
 
-const CONNECT = [
+const PEOPLE = [
   {
     name: 'Aanya',
-    languages: 'Hindi, English',
-    background: '#FFD88C',
-    tint: '#9963EC',
+    age: 22,
+    languages: ['Hindi', 'English'],
+    bio: 'Good vibes only ✨',
+    background: '#F590C1',
+    hair: '#482721',
+    shirt: '#F17198',
     verified: true,
   },
   {
     name: 'Riya',
-    languages: 'Marathi, Hindi',
-    background: '#F89AAB',
-    tint: '#7599EE',
-    hair: '#63362C',
+    age: 24,
+    languages: ['Marathi', 'Hindi'],
+    bio: 'Let’s talk! 💜',
+    background: '#9A83F8',
+    hair: '#63362D',
+    shirt: '#A58CF4',
+    bun: true,
   },
   {
     name: 'Kiara',
-    languages: 'English, Tamil',
-    background: '#CBD6F7',
-    tint: '#AAA0EF',
-    shirt: '#ECE9FA',
-  },
-];
-const CHAT = [
-  {
-    name: 'Sweety',
-    languages: 'Hindi',
-    background: '#FFBC64',
-    tint: '#202237',
-  },
-  {
-    name: 'Muskan',
-    languages: 'Marathi',
-    background: '#F39CC9',
-    tint: '#242238',
-    favorite: true,
-  },
-  {
-    name: 'Neha',
-    languages: 'English',
-    background: '#A095EF',
-    tint: '#242238',
+    age: 23,
+    languages: ['English', 'Tamil'],
+    bio: 'Always up for fun 😄',
+    background: '#FFE3A3',
+    hair: '#352224',
+    shirt: '#292338',
     glasses: true,
-    shirt: '#6DAEBB',
   },
 ];
-function Gradient({ from = '#914AFF', to = '#6131E9', radius = 18 }) {
-  const id = useId();
+const CHATS = [
+  {
+    name: 'Aryan',
+    language: 'Hindi',
+    gender: 'male',
+    background: '#FFE49A',
+    hair: '#24212B',
+    shirt: '#50416F',
+  },
+  {
+    name: 'Sneha',
+    language: 'Marathi',
+    background: '#FF92C2',
+    shirt: '#E78EA6',
+  },
+  {
+    name: 'Rohan',
+    language: 'English',
+    gender: 'male',
+    background: '#87C6FF',
+    hair: '#523A30',
+    shirt: '#568BC4',
+    glasses: true,
+  },
+];
+const FILTERS = [
+  { label: 'For You', icon: Star },
+  { label: 'Online' },
+  { label: 'Nearby', icon: MapPin },
+];
+const TABS = [
+  { label: 'Home', icon: House },
+  { label: 'Chats', icon: MessageCircle },
+  { label: 'Calls', icon: Phone },
+  { label: 'Profile', icon: UserRound },
+];
+
+function CallCard({ person, onPress }) {
   return (
-    <Svg
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-      width="100%"
-      height="100%"
-    >
-      <Defs>
-        <LinearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0" stopColor={from} />
-          <Stop offset="1" stopColor={to} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" rx={radius} fill={`url(#${id})`} />
-    </Svg>
-  );
-}
-function PersonCard({ person, chat, onPress }) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.portraitArea}>
-        <Gradient from={person.tint} to="#171522" radius={16} />
-        <View style={styles.avatar}>
-          <ProfileAvatar {...person} />
-        </View>
-        <View style={styles.onlineDot} />
-        {person.favorite && (
-          <View style={styles.heartBadge}>
-            <Text style={styles.heart}>♥</Text>
-          </View>
-        )}
+    <View style={styles.callCard}>
+      <Gradient from="#25273C" to="#151321" radius={17} />
+      <View style={styles.portrait}>
+        <ProfileAvatar {...person} />
+        <View style={styles.online} />
       </View>
-      <View style={styles.nameRow}>
-        <Text numberOfLines={1} style={styles.name}>
+      <View style={styles.personNameRow}>
+        <Text numberOfLines={1} style={styles.personName}>
           {person.name}
         </Text>
+        <Text style={styles.age}>{person.age}</Text>
         {person.verified && (
           <View style={styles.verified}>
-            <Check size={10} color="white" strokeWidth={3} />
+            <Check size={9} strokeWidth={3} color="#FFFFFF" />
           </View>
         )}
       </View>
-      <Text numberOfLines={1} style={styles.languages}>
-        {person.languages}
+      <View style={styles.languageTags}>
+        {person.languages.map(language => (
+          <View key={language} style={styles.languageTag}>
+            <Text style={styles.languageText}>{language}</Text>
+          </View>
+        ))}
+      </View>
+      <Text numberOfLines={1} style={styles.bio}>
+        {person.bio}
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${chat ? 'Chat with' : 'Call'} ${person.name}`}
+        accessibilityLabel={`Join call with ${person.name}`}
         onPress={onPress}
-        style={({ pressed }) => [styles.cardButton, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.callButton, pressed && styles.pressed]}
       >
         <Gradient radius={22} />
-        {chat ? (
-          <MessageCircle size={14} color="white" fill="white" />
-        ) : (
-          <Phone size={13} color="white" fill="white" />
-        )}
-        <Text style={styles.cardButtonLabel}>
-          {chat ? 'Chat' : 'Join Call'}
-        </Text>
+        <Phone size={13} fill="#FFFFFF" color="#FFFFFF" />
+        <Text style={styles.callLabel}>Join Call</Text>
       </Pressable>
     </View>
   );
 }
-export default function HomeScreen() {
+function ChatCard({ person, onPress }) {
+  return (
+    <View style={styles.chatCard}>
+      <Gradient from="#1C2135" to="#121321" radius={14} />
+      <View style={styles.chatTop}>
+        <View style={styles.chatAvatar}>
+          <ProfileAvatar {...person} />
+          <View style={styles.smallOnline} />
+        </View>
+        <View style={styles.chatDetails}>
+          <Text numberOfLines={1} style={styles.chatName}>
+            {person.name}
+          </Text>
+          <Text style={styles.chatLanguage}>{person.language}</Text>
+        </View>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Chat with ${person.name}`}
+        onPress={onPress}
+        style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
+      >
+        <MessageCircle size={11} color="#FFFFFF" fill="#FFFFFF" />
+        <Text style={styles.chatButtonText}>Chat</Text>
+      </Pressable>
+    </View>
+  );
+}
+function SectionTitle({ title, subtitle, isNew, onPress }) {
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={styles.sectionLine}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {isNew && (
+          <View style={styles.newBadge}>
+            <Text style={styles.newText}>New</Text>
+          </View>
+        )}
+        <View style={styles.flex} />
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPress}
+          hitSlop={8}
+          style={styles.seeAll}
+        >
+          <Text style={styles.seeAllText}>See all</Text>
+          <ChevronRight size={12} color="#B37AFF" />
+        </Pressable>
+      </View>
+      <Text style={styles.subtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+export default function HomeScreen({navigation}) {
+  const toast = useToast();
   const [filter, setFilter] = useState('For You');
   const [claimed, setClaimed] = useState(false);
-  const toast = useToast();
-  const preview = feature => toast(`${feature} is coming soon`);
-  const claim = () => {
-    setClaimed(true);
-    toast('50 demo coins claimed');
-  };
+  const preview = label => toast(`${label} is coming soon`);
   return (
     <SafeAreaView
       style={styles.screen}
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['top', 'bottom', 'left', 'right']}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#080910" />
+      <StatusBar barStyle="light-content" backgroundColor="#0B0D20" />
+      <View style={styles.ambient} pointerEvents="none">
+        <Gradient from="#171A40" to="#080910" radius={0} />
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={styles.content}
       >
         <View style={styles.header}>
           <View>
@@ -167,34 +218,36 @@ export default function HomeScreen() {
           </View>
           <View style={styles.headerActions}>
             <View style={styles.wallet}>
-              <Text style={styles.coin}>🪙</Text>
-              <Text style={styles.balance}>{claimed ? 170 : 120}</Text>
+              <Coin size={21} />
+              <Text style={styles.balance}>{claimed ? 220 : 170}</Text>
               <Pressable
-                accessibilityLabel="Add coins"
                 accessibilityRole="button"
+                accessibilityLabel="Add coins"
                 onPress={() => preview('Coin store')}
-                style={styles.addCoins}
+                style={styles.plus}
               >
-                <Plus size={16} color="white" />
+                <Gradient from="#733DCF" to="#291A54" radius={8} />
+                <Plus size={16} color="#F6DFFF" />
               </Pressable>
             </View>
             <Pressable
-              accessibilityLabel="Notifications"
               accessibilityRole="button"
-              hitSlop={10}
+              accessibilityLabel="Notifications"
               onPress={() => preview('Notifications')}
+              hitSlop={10}
               style={styles.bell}
             >
-              <Bell size={24} color="#DFDDE8" />
-              <View style={styles.notificationDot} />
+              <Bell size={22} color="#DBD8E9" />
+              <View style={styles.notification} />
             </Pressable>
           </View>
         </View>
+
         <View style={styles.reward}>
-          <Gradient from="#653189" to="#17112F" />
-          <View style={styles.rewardHeading}>
-            <Text style={styles.gift}>🎁</Text>
-            <View style={styles.flex}>
+          <Gradient from="#8139CF" to="#2B1555" radius={17} glow />
+          <View style={styles.rewardTop}>
+            <Gift />
+            <View style={styles.rewardCopy}>
               <Text style={styles.rewardTitle}>DAILY FREE COINS</Text>
               <Text style={styles.rewardDescription}>
                 Claim your free coins everyday{'\n'}and keep the conversations
@@ -202,150 +255,120 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
+          <View style={styles.freeBadge}>
+            <Sparkles size={10} color="#FFCC6B" />
+            <Text style={styles.freeText}>Free</Text>
+          </View>
           <View style={styles.claimRow}>
-            <Text style={styles.rewardCoin}>🪙</Text>
-            <Text style={styles.rewardAmount}>50 coins</Text>
+            <Coin size={27} />
+            <Text style={styles.coinAmount}>50 coins</Text>
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ disabled: claimed }}
               disabled={claimed}
-              onPress={claim}
+              onPress={() => {
+                setClaimed(true);
+                toast('50 demo coins claimed');
+              }}
               style={styles.claimButton}
             >
-              <Gradient radius={22} />
+              <Gradient from="#D25BFF" to="#6B25EE" radius={18} />
               <Text style={styles.claimText}>
-                {claimed ? 'Claimed' : 'Claim'}
+                {claimed ? 'Claimed' : 'Claim Now'}
               </Text>
+              <ChevronRight size={16} color="#FFFFFF" />
             </Pressable>
           </View>
-          <View style={styles.rewardTimer}>
-            <Clock3 size={15} color="#DBD4E9" />
+          <View style={styles.timer}>
+            <Clock3 size={12} color="#C4B8D8" />
             <Text style={styles.timerText}>
               Next reward in <Text style={styles.timerBold}>10h 18m 40s</Text>
             </Text>
           </View>
         </View>
+
         <View style={styles.filters}>
-          {[
-            { label: 'For You', icon: Star },
-            { label: 'Online', icon: null },
-            { label: 'Nearby', icon: MapPin },
-          ].map(({ label, icon: Icon }) => (
+          {FILTERS.map(({ label, icon: Icon }) => (
             <Pressable
               key={label}
               accessibilityRole="tab"
-              accessibilityState={{ selected: filter === label }}
-              onPress={() => {
-                setFilter(label);
-                if (label === 'Nearby') {
-                  toast('Showing sample nearby profiles');
-                }
-              }}
-              style={[styles.filter, filter === label && styles.filterSelected]}
+              accessibilityState={{ selected: label === filter }}
+              onPress={() => setFilter(label)}
+              style={[styles.filter, label === filter && styles.selectedFilter]}
             >
-              {filter === label && <Gradient radius={16} />}
+              {label === filter ? (
+                <Gradient from="#A447FA" to="#5916E6" radius={13} />
+              ) : (
+                <Gradient from="#171927" to="#0D0E1A" radius={13} />
+              )}
               {Icon ? (
                 <Icon
-                  size={21}
-                  color={label === 'Nearby' ? '#C071FF' : '#FFFFFF'}
+                  size={18}
+                  color={label === 'Nearby' ? '#BD74FF' : '#FFFFFF'}
                   fill={label === 'For You' ? '#FFFFFF' : 'none'}
                 />
               ) : (
-                <View style={styles.filterOnline} />
+                <View style={styles.filterDot} />
               )}
-              <Text style={styles.filterText}>{label}</Text>
+              <Text style={styles.filterLabel}>{label}</Text>
             </Pressable>
           ))}
         </View>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>MILO Connect</Text>
-          <View style={styles.flex} />
-          <Pressable
-            onPress={() => preview('More profiles')}
-            accessibilityRole="button"
-            hitSlop={8}
-          >
-            <Text style={styles.seeAll}>See all</Text>
-          </Pressable>
-        </View>
-        <View style={styles.cards}>
-          {CONNECT.map(person => (
-            <PersonCard
+
+        <SectionTitle
+          title="MILO Connect"
+          subtitle="Real people. Real conversations."
+          onPress={() => preview('More profiles')}
+        />
+        <View style={styles.cardRow}>
+          {PEOPLE.map(person => (
+            <CallCard
               key={person.name}
               person={person}
               onPress={() => preview('Voice calling')}
             />
           ))}
         </View>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>MILO Chat</Text>
-          <View style={styles.newBadge}>
-            <Text style={styles.newText}>New</Text>
-          </View>
-          <View style={styles.flex} />
-          <Pressable
-            onPress={() => preview('More chats')}
-            accessibilityRole="button"
-            hitSlop={8}
-          >
-            <Text style={styles.seeAll}>See all</Text>
-          </Pressable>
-        </View>
-        <View style={styles.cards}>
-          {CHAT.map(person => (
-            <PersonCard
+        <SectionTitle
+          title="MILO Chat"
+          subtitle="Start a chat before you call."
+          isNew
+          onPress={() => preview('More chats')}
+        />
+        <View style={styles.cardRow}>
+          {CHATS.map(person => (
+            <ChatCard
               key={person.name}
               person={person}
-              chat
               onPress={() => preview('Chat')}
             />
           ))}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => preview('Premium')}
-          style={styles.premium}
-        >
-          <Gradient from="#282218" to="#342A1B" radius={16} />
-          <Crown size={31} color="#FFD35C" fill="#FFD35C" />
-          <View style={styles.flex}>
-            <Text style={styles.premiumTitle}>Go Premium</Text>
-            <Text style={styles.premiumDescription}>
-              Get more visibility & better matches
-            </Text>
-          </View>
-          <View style={styles.premiumArrow}>
-            <ChevronRight size={18} color="#4B3114" />
-          </View>
-        </Pressable>
       </ScrollView>
       <View style={styles.bottomBar}>
-        {[
-          { label: 'Home', icon: House },
-          { label: 'Chats', icon: MessageCircle },
-          { label: 'Calls', icon: Phone },
-          { label: 'Profile', icon: UserRound },
-        ].map(({ label, icon: Icon }) => (
+        <Gradient from="#17142F" to="#090B15" radius={22} />
+        {TABS.map(({ label, icon: Icon }) => (
           <Pressable
             key={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: label === 'Home' }}
-            onPress={() => label !== 'Home' && preview(label)}
+            onPress={() => label === 'Profile' ? navigation.navigate('Profile') : label !== 'Home' && preview(label)}
             style={styles.navItem}
           >
-            <View>
+            <View style={label === 'Home' && styles.homeGlow}>
               <Icon
-                size={24}
-                color={label === 'Home' ? '#9451FF' : '#BCBBC6'}
-                fill={label === 'Home' ? '#9451FF' : 'none'}
+                size={23}
+                color={label === 'Home' ? '#BA5BFF' : '#BCB9CC'}
+                fill={label === 'Home' ? '#A449FA' : 'none'}
               />
               {label === 'Chats' && (
-                <View style={styles.chatBadge}>
-                  <Text style={styles.chatBadgeText}>3</Text>
+                <View style={styles.navBadge}>
+                  <Text style={styles.navBadgeText}>3</Text>
                 </View>
               )}
             </View>
             <Text
-              style={[styles.navLabel, label === 'Home' && styles.navActive]}
+              style={[styles.navLabel, label === 'Home' && styles.activeNav]}
             >
               {label}
             </Text>
@@ -355,291 +378,319 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#080910' },
   flex: { flex: 1 },
-  scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 12,
-    maxWidth: 520,
+  ambient: { position: 'absolute', top: 0, left: 0, right: 0, height: 180 },
+  content: {
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 24,
     width: '100%',
+    maxWidth: 520,
     alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 22,
+    alignItems: 'center',
+    marginBottom: 18,
   },
   logo: {
     fontFamily: 'Poppins-ExtraBold',
-    fontSize: 33,
-    lineHeight: 42,
-    color: '#FFF7FF',
+    fontSize: 31,
+    lineHeight: 37,
+    color: '#FFF9FF',
     letterSpacing: -1,
   },
   logoHeart: {
     position: 'absolute',
-    left: 38,
-    top: -5,
-    color: '#FF538F',
-    fontSize: 14,
+    left: 34,
+    top: -6,
+    fontSize: 15,
+    color: '#FF628C',
   },
-  tagline: { fontFamily: 'Poppins-Regular', color: '#E1DCE8', fontSize: 11 },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 17,
-    paddingTop: 6,
-  },
+  tagline: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#C9C3D8' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   wallet: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#302B42',
-    borderRadius: 22,
+    borderColor: '#3B334D',
+    borderRadius: 18,
     padding: 4,
-    gap: 6,
+    gap: 5,
+    backgroundColor: '#171322',
   },
-  coin: { fontSize: 22 },
-  balance: { fontSize: 15, color: '#FFFFFF', marginRight: 3 },
-  addCoins: {
-    backgroundColor: '#783BF5',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  balance: { fontSize: 13, color: '#FFFFFF', marginRight: 2 },
+  plus: {
+    width: 23,
+    height: 23,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#9565C8',
+    borderRadius: 8,
   },
-  bell: { paddingTop: 3 },
-  notificationDot: {
+  bell: { padding: 3 },
+  notification: {
     position: 'absolute',
-    right: -2,
-    top: -3,
-    width: 10,
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#FF5066',
+    top: 0,
+    right: 0,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#FF426C',
   },
   reward: {
     borderWidth: 1,
-    borderColor: '#684094',
-    borderRadius: 18,
+    borderColor: '#A265DE',
+    borderRadius: 17,
     padding: 12,
     overflow: 'hidden',
+    shadowColor: '#A447FA',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
   },
-  rewardHeading: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  gift: { fontSize: 50 },
-  rewardTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
+  rewardTop: { flexDirection: 'row', alignItems: 'center', paddingTop: 2 },
+  rewardCopy: { flex: 1, paddingTop: 5 },
+  rewardTitle: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#FFFFFF' },
   rewardDescription: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 11,
-    lineHeight: 16,
-    color: '#F0E9F9',
+    fontSize: 9,
+    lineHeight: 13,
+    color: '#F3E8FF',
   },
+  freeBadge: {
+    position: 'absolute',
+    right: 9,
+    top: 6,
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+    backgroundColor: '#542278',
+    borderColor: '#D984F3',
+    borderWidth: 0.7,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  freeText: { fontSize: 9, color: '#FFEAF6' },
   claimRow: {
-    backgroundColor: '#171029',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    gap: 9,
+    backgroundColor: '#1C0E3C',
+    borderRadius: 15,
   },
-  rewardCoin: { fontSize: 28 },
-  rewardAmount: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 22,
-    color: '#FFDA62',
+  coinAmount: {
     flex: 1,
+    fontFamily: 'Poppins-Bold',
+    fontSize: 21,
+    color: '#FFDC51',
   },
   claimButton: {
-    minWidth: 90,
-    minHeight: 37,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  claimText: { color: '#FFFFFF', fontFamily: 'Poppins-Medium', fontSize: 13 },
-  rewardTimer: {
+    height: 35,
+    minWidth: 101,
     flexDirection: 'row',
-    gap: 7,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  timerText: { fontSize: 12, color: '#E2DCEB' },
-  timerBold: { fontWeight: '700' },
-  filters: { flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 6 },
-  filter: {
-    flex: 1,
-    minHeight: 62,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#2E2B41',
-    backgroundColor: '#11121F',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+  claimText: { fontFamily: 'Poppins-Medium', fontSize: 11, color: '#FFFFFF' },
+  timer: {
+    marginTop: 5,
+    borderRadius: 12,
+    backgroundColor: '#1B0C36',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 6,
+  },
+  timerText: { fontSize: 9, color: '#C9BBD9' },
+  timerBold: { color: '#F1EAF8', fontWeight: '700' },
+  filters: { flexDirection: 'row', gap: 10, marginTop: 22 },
+  filter: {
+    flex: 1,
+    minHeight: 51,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#2D2B41',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  selectedFilter: { borderColor: '#B174FF' },
+  filterDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#00E69A',
+    marginVertical: 4,
+  },
+  filterLabel: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#EEE7FA' },
+  sectionHeading: { marginTop: 28, marginBottom: 14 },
+  sectionLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 20,
+    lineHeight: 27,
+    color: '#E8D7FF',
+  },
+  subtitle: {
+    fontFamily: 'Poppins-Regular',
+    color: '#A8A5B9',
+    fontSize: 10,
+    lineHeight: 15,
+  },
+  seeAll: { flexDirection: 'row', alignItems: 'center' },
+  seeAllText: { fontSize: 10, color: '#B37AFF' },
+  cardRow: { flexDirection: 'row', gap: 7 },
+  callCard: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: '#36334C',
+    borderRadius: 17,
+    padding: 9,
     overflow: 'hidden',
   },
-  filterSelected: { borderColor: '#A474FF' },
-  filterOnline: {
+  portrait: { width: '100%', aspectRatio: 1, maxHeight: 140 },
+  online: {
+    position: 'absolute',
+    right: 3,
+    top: 3,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#21DE85',
-    marginVertical: 4,
+    backgroundColor: '#20EE90',
+    borderWidth: 1,
+    borderColor: '#398C77',
   },
-  filterText: { color: '#F4EEFA', fontSize: 12, fontFamily: 'Poppins-Regular' },
-  sectionHeader: {
+  personNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 18,
-    marginBottom: 12,
-    gap: 12,
+    gap: 5,
+    marginTop: 3,
   },
-  sectionTitle: {
+  personName: {
+    color: '#FFFFFF',
     fontFamily: 'Poppins-SemiBold',
-    color: '#F6F5FA',
-    fontSize: 20,
+    fontSize: 12,
+    flexShrink: 1,
   },
-  seeAll: { color: '#C6B4E1', fontSize: 12 },
-  cards: { flexDirection: 'row', gap: 8 },
-  card: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: '#1A1829',
-    borderWidth: 1,
-    borderColor: '#2B263E',
-    borderRadius: 18,
-    overflow: 'hidden',
-    paddingBottom: 7,
-  },
-  portraitArea: { height: 100, width: '100%' },
-  avatar: { position: 'absolute', left: 5, right: 5, top: 7, bottom: 0 },
-  onlineDot: {
-    position: 'absolute',
-    width: 15,
-    height: 15,
-    borderRadius: 8,
-    backgroundColor: '#00D875',
-    borderWidth: 2,
-    borderColor: '#83F0B4',
-    right: 7,
-    top: 9,
-  },
-  heartBadge: {
-    position: 'absolute',
-    right: 6,
-    bottom: 0,
-    borderRadius: 13,
-    width: 24,
-    height: 24,
-    backgroundColor: '#FF496E',
+  age: { color: '#DDD8EA', fontSize: 10 },
+  verified: {
+    width: 12,
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: '#5E526F',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heart: { color: 'white', fontSize: 19 },
-  nameRow: {
+  languageTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginTop: 3,
+  },
+  languageTag: {
+    borderRadius: 8,
+    backgroundColor: '#2C2B40',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  languageText: { fontSize: 8, color: '#D1CDDF' },
+  bio: { fontSize: 8, color: '#DDD7E8', marginTop: 7, marginBottom: 7 },
+  callButton: {
+    height: 33,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  callLabel: { color: '#FFFFFF', fontFamily: 'Poppins-Medium', fontSize: 10 },
+  pressed: { opacity: 0.7 },
+  newBadge: {
+    borderWidth: 1,
+    borderColor: '#027F65',
+    borderRadius: 10,
+    backgroundColor: '#063426',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  newText: { color: '#05E4A2', fontSize: 9 },
+  chatCard: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#292A40',
+    padding: 8,
+    overflow: 'hidden',
+  },
+  chatTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  chatAvatar: { width: '48%', aspectRatio: 1 },
+  chatDetails: { flex: 1 },
+  smallOnline: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#15E787',
+  },
+  chatName: { fontFamily: 'Poppins-Medium', color: '#F1EAF8', fontSize: 9 },
+  chatLanguage: { color: '#AFA8C4', fontSize: 8, marginTop: 2 },
+  chatButton: {
+    alignSelf: 'flex-end',
+    minHeight: 24,
+    borderRadius: 14,
+    backgroundColor: '#3B285F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
-    paddingHorizontal: 3,
-    marginTop: 3,
+    paddingHorizontal: 8,
+    marginTop: 2,
   },
-  name: {
-    color: '#FFFFFF',
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-    flexShrink: 1,
-  },
-  verified: { backgroundColor: '#8C44FF', padding: 2, borderRadius: 8 },
-  languages: {
-    color: '#D1CADC',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 1,
-    marginBottom: 8,
-  },
-  cardButton: {
-    marginHorizontal: 5,
-    height: 35,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  cardButtonLabel: { fontSize: 11, color: 'white' },
-  pressed: { opacity: 0.75 },
-  newBadge: {
+  chatButtonText: { fontSize: 9, color: '#FFFFFF' },
+  bottomBar: {
+    marginHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 9,
     borderWidth: 1,
-    borderColor: '#00CA78',
-    backgroundColor: '#08251E',
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 1,
-  },
-  newText: { color: '#71FFB4', fontSize: 11 },
-  premium: {
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#75603A',
-    borderRadius: 16,
-    minHeight: 69,
+    borderColor: '#4F426A',
+    borderRadius: 22,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    gap: 13,
     overflow: 'hidden',
   },
-  premiumTitle: {
-    color: '#FFCF5A',
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+  navItem: { flex: 1, alignItems: 'center', gap: 6 },
+  navLabel: { color: '#C5BED3', fontSize: 10 },
+  activeNav: { color: '#CE88FF', fontWeight: '700' },
+  homeGlow: {
+    shadowColor: '#B04DFF',
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
   },
-  premiumDescription: { color: '#ECE5DA', fontSize: 10 },
-  premiumArrow: {
-    width: 23,
-    height: 23,
-    borderRadius: 12,
-    backgroundColor: '#DCA143',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderColor: '#363045',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    backgroundColor: '#0B0B14',
-    paddingTop: 13,
-    paddingBottom: 10,
-  },
-  navItem: { flex: 1, alignItems: 'center', gap: 7 },
-  navLabel: { fontSize: 11, color: '#DDD8E4' },
-  navActive: { color: '#A367FF', fontWeight: '700' },
-  chatBadge: {
+  navBadge: {
     position: 'absolute',
-    right: -8,
+    right: -7,
     top: -7,
-    width: 18,
-    height: 18,
+    width: 17,
+    height: 17,
     borderRadius: 9,
-    backgroundColor: '#FF475C',
+    backgroundColor: '#F94668',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chatBadgeText: { fontSize: 10, color: 'white' },
+  navBadgeText: { color: '#FFFFFF', fontSize: 10 },
 });
