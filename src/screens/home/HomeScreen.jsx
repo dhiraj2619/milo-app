@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 import {
+  Animated,
   Pressable,
   ScrollView,
   StatusBar,
@@ -21,10 +22,12 @@ import {
   Sparkles,
   Star,
   UserRound,
+  X,
 } from 'lucide-react-native';
 import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
+import { getMyProfile } from '../../services/userService';
 
 const PEOPLE = [
   {
@@ -194,7 +197,21 @@ export default function HomeScreen({navigation}) {
   const toast = useToast();
   const [filter, setFilter] = useState('For You');
   const [claimed, setClaimed] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
+  React.useEffect(() => {
+    getMyProfile().then(setProfile).catch(() => {});
+  }, []);
+  const openDrawer = () => {
+    setDrawerOpen(true);
+    Animated.spring(drawerX, {toValue: 0, useNativeDriver: true, damping: 22, stiffness: 190}).start();
+  };
+  const closeDrawer = () => {
+    Animated.timing(drawerX, {toValue: 420, duration: 220, useNativeDriver: true}).start(() => setDrawerOpen(false));
+  };
+  const userAvatar = profile?.avatarStyle || {avatarSeed: profile?.avatarSeed || 'milo-user', gender: profile?.gender || 'female'};
   return (
     <SafeAreaView
       style={styles.screen}
@@ -209,13 +226,10 @@ export default function HomeScreen({navigation}) {
         contentContainerStyle={styles.content}
       >
         <View style={styles.header}>
-          <View>
-            <View>
-              <Text style={styles.logo}>MiLO</Text>
-              <Text style={styles.logoHeart}>♥</Text>
-            </View>
-            <Text style={styles.tagline}>Meet. Talk. Connect.</Text>
-          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={openDrawer} style={styles.headerProfile}>
+            <View style={styles.headerAvatar}><ProfileAvatar {...userAvatar} photoUrl={profile?.photoUrl} /><View style={styles.headerOnline} /></View>
+            <View><Text numberOfLines={1} style={styles.headerName}>{profile?.nickname || 'My Profile'}</Text><Text style={styles.tagline}>View profile</Text></View>
+          </Pressable>
           <View style={styles.headerActions}>
             <View style={styles.wallet}>
               <Coin size={21} />
@@ -352,7 +366,7 @@ export default function HomeScreen({navigation}) {
             key={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: label === 'Home' }}
-            onPress={() => label === 'Profile' ? navigation.navigate('Profile') : label !== 'Home' && preview(label)}
+            onPress={() => label === 'Profile' ? openDrawer() : label !== 'Home' && preview(label)}
             style={styles.navItem}
           >
             <View style={label === 'Home' && styles.homeGlow}>
@@ -375,6 +389,18 @@ export default function HomeScreen({navigation}) {
           </Pressable>
         ))}
       </View>
+      {drawerOpen && <View style={styles.drawerLayer}>
+        <Pressable accessibilityLabel="Close profile" onPress={closeDrawer} style={styles.drawerBackdrop} />
+        <Animated.View style={[styles.drawer, {transform: [{translateX: drawerX}]}]}>
+          <View style={styles.drawerHeader}><Text style={styles.drawerTitle}>My Profile</Text><Pressable onPress={closeDrawer} style={styles.drawerClose}><X size={22} color="#F5F0FF" /></Pressable></View>
+          <View style={styles.drawerAvatar}><ProfileAvatar {...userAvatar} photoUrl={profile?.photoUrl} /><View style={styles.drawerOnline} /></View>
+          <Text style={styles.drawerName}>{profile?.nickname || 'MILO user'}</Text>
+          <Text style={styles.drawerPhone}>{profile?.phone || 'Complete your profile'}</Text>
+          <Pressable onPress={() => {closeDrawer(); navigation.navigate('Profile');}} style={styles.editProfile}><Text style={styles.editProfileText}>View & edit profile</Text><ChevronRight size={18} color="#FFFFFF" /></Pressable>
+          <View style={styles.drawerInfo}><Text style={styles.drawerLabel}>Gender</Text><Text style={styles.drawerValue}>{profile?.gender || 'Not set'}</Text></View>
+          <View style={styles.drawerInfo}><Text style={styles.drawerLabel}>Languages</Text><Text style={styles.drawerValue}>{profile?.languages?.join(', ') || 'Not set'}</Text></View>
+        </Animated.View>
+      </View>}
     </SafeAreaView>
   );
 }
@@ -397,20 +423,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 18,
   },
-  logo: {
-    fontFamily: 'Poppins-ExtraBold',
-    fontSize: 31,
-    lineHeight: 37,
-    color: '#FFF9FF',
-    letterSpacing: -1,
-  },
-  logoHeart: {
-    position: 'absolute',
-    left: 34,
-    top: -6,
-    fontSize: 15,
-    color: '#FF628C',
-  },
+  headerProfile: {flexDirection: 'row', alignItems: 'center', gap: 10, maxWidth: '54%'},
+  headerAvatar: {width: 47, height: 47, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: '#25E989'},
+  headerOnline: {position: 'absolute', right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#0B0D20', backgroundColor: '#25E989'},
+  headerName: {fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#FFF9FF'},
   tagline: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#C9C3D8' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   wallet: {
@@ -693,4 +709,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navBadgeText: { color: '#FFFFFF', fontSize: 10 },
+  drawerLayer: {position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, flexDirection: 'row'},
+  drawerBackdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,0.62)'},
+  drawer: {width: '86%', maxWidth: 390, height: '100%', paddingHorizontal: 24, paddingTop: 22, backgroundColor: '#121021', borderLeftWidth: 1, borderColor: '#4B3A69', shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 18, elevation: 18},
+  drawerHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  drawerTitle: {color: '#FFFFFF', fontFamily: 'Poppins-SemiBold', fontSize: 21},
+  drawerClose: {width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#241D33'},
+  drawerAvatar: {width: 108, height: 108, alignSelf: 'center', marginTop: 36, borderRadius: 54, overflow: 'hidden', borderWidth: 3, borderColor: '#A65AFF'},
+  drawerOnline: {position: 'absolute', right: 4, bottom: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: '#25E989', borderWidth: 3, borderColor: '#121021'},
+  drawerName: {color: '#FFFFFF', fontFamily: 'Poppins-SemiBold', fontSize: 23, textAlign: 'center', marginTop: 15},
+  drawerPhone: {color: '#B7B0C5', fontSize: 13, textAlign: 'center', marginTop: 3},
+  editProfile: {height: 54, marginTop: 30, paddingHorizontal: 18, borderRadius: 16, backgroundColor: '#8138EF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  editProfileText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 15},
+  drawerInfo: {paddingVertical: 18, borderBottomWidth: 1, borderColor: '#30293D'},
+  drawerLabel: {color: '#A9A1BA', fontSize: 12},
+  drawerValue: {color: '#F3ECFF', fontFamily: 'Poppins-Medium', fontSize: 15, marginTop: 5, textTransform: 'capitalize'},
 });

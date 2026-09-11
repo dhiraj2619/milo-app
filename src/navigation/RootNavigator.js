@@ -4,10 +4,9 @@ import AuthNavigator from './AuthNavigator';
 
 const Stack = createNativeStackNavigator();
 
-const RootNavigator = () => (
+const RootNavigator = ({signedIn}) => (
   <Stack.Navigator screenOptions={{headerShown: false}}>
-    <Stack.Screen name="Auth" component={AuthNavigator} />
-    <Stack.Screen name="Main" component={MainNavigator} />
+    {signedIn ? <Stack.Screen name="Main" component={MainNavigator} /> : <Stack.Screen name="Auth" component={AuthNavigator} />}
   </Stack.Navigator>
 );
 

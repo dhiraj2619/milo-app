@@ -7,6 +7,7 @@ import {
   PhoneAuthProvider,
 } from '@react-native-firebase/auth';
 import api from './api';
+import {saveSessionProfile} from './sessionService';
 
 let pendingConfirmation = null;
 let pendingPhone = null;
@@ -27,6 +28,7 @@ export async function completeProfile({nickname, gender, languages, avatarSeed, 
   if (!response.data.success || !profile?._id || profile.profileCompleted !== true || profile.firebaseUid !== user.uid || profile.nickname !== nickname || profile.gender !== gender || !languages.every(language => profile.languages?.includes(language))) {
     throw new Error('Your profile could not be saved completely. Please try again.');
   }
+  await saveSessionProfile(profile);
   return profile;
 }
 
@@ -66,5 +68,9 @@ export async function verifyPhoneOTP(otp, phone) {
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || 'Unable to complete sign-in. Please retry.');
   }
-  return response.data.data;
+  const result = response.data.data;
+  if (result.user?.profileCompleted) {
+    await saveSessionProfile(result.user);
+  }
+  return result;
 }
