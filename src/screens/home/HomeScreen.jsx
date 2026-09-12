@@ -22,12 +22,13 @@ import {
   Sparkles,
   Star,
   UserRound,
+  Video,
   X,
 } from 'lucide-react-native';
 import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
-import { getMyProfile } from '../../services/userService';
+import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 
 const PEOPLE = [
   {
@@ -85,6 +86,9 @@ const CHATS = [
     shirt: '#568BC4',
     glasses: true,
   },
+  {name: 'Meera', language: 'English', background: '#FFB2D3', hair: '#45231F', shirt: '#D96A9D'},
+  {name: 'Kabir', language: 'Hindi', gender: 'male', background: '#A6D4FF', hair: '#352720', shirt: '#4385B7', glasses: true},
+  {name: 'Pooja', language: 'Tamil', background: '#E28CDE', hair: '#302020', shirt: '#B845B0'},
 ];
 const FILTERS = [
   { label: 'For You', icon: Star },
@@ -99,18 +103,19 @@ const TABS = [
 ];
 
 function CallCard({ person, onPress }) {
+  const avatar = person.avatarStyle || person;
   return (
     <View style={styles.callCard}>
       <Gradient from="#25273C" to="#151321" radius={17} />
       <View style={styles.portrait}>
-        <ProfileAvatar {...person} />
-        <View style={styles.online} />
+        <ProfileAvatar {...avatar} name={person.nickname || person.name} photoUrl={person.photoUrl} />
+        <View style={styles.presenceBadge}><View style={[styles.presenceDot, !person.isOnline && styles.offlineDot]} /><Text style={styles.presenceText}>{person.isOnline === false ? 'Offline' : 'Online'}</Text></View>
       </View>
       <View style={styles.personNameRow}>
         <Text numberOfLines={1} style={styles.personName}>
-          {person.name}
+          {person.nickname || person.name}
         </Text>
-        <Text style={styles.age}>{person.age}</Text>
+        <Text style={styles.age}>{person.age || ''}</Text>
         {person.verified && (
           <View style={styles.verified}>
             <Check size={9} strokeWidth={3} color="#FFFFFF" />
@@ -118,54 +123,23 @@ function CallCard({ person, onPress }) {
         )}
       </View>
       <View style={styles.languageTags}>
-        {person.languages.map(language => (
+        {(person.languages || []).slice(0, 2).map(language => (
           <View key={language} style={styles.languageTag}>
             <Text style={styles.languageText}>{language}</Text>
           </View>
         ))}
       </View>
-      <Text numberOfLines={1} style={styles.bio}>
-        {person.bio}
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Join call with ${person.name}`}
-        onPress={onPress}
-        style={({ pressed }) => [styles.callButton, pressed && styles.pressed]}
-      >
-        <Gradient radius={22} />
-        <Phone size={13} fill="#FFFFFF" color="#FFFFFF" />
-        <Text style={styles.callLabel}>Join Call</Text>
-      </Pressable>
+      <Text numberOfLines={1} style={styles.bio}>{person.bio || 'Ready to connect ✨'}</Text>
+      <View style={styles.callActions}><Pressable accessibilityLabel={`Video call ${person.nickname || person.name}`} onPress={() => onPress('Video')} style={styles.videoButton}><Video size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Video</Text></Pressable><Pressable accessibilityLabel={`Voice call ${person.nickname || person.name}`} onPress={() => onPress('Voice')} style={styles.voiceButton}><Phone size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Voice</Text></Pressable></View>
     </View>
   );
 }
 function ChatCard({ person, onPress }) {
   return (
-    <View style={styles.chatCard}>
-      <Gradient from="#1C2135" to="#121321" radius={14} />
-      <View style={styles.chatTop}>
-        <View style={styles.chatAvatar}>
-          <ProfileAvatar {...person} />
-          <View style={styles.smallOnline} />
-        </View>
-        <View style={styles.chatDetails}>
-          <Text numberOfLines={1} style={styles.chatName}>
-            {person.name}
-          </Text>
-          <Text style={styles.chatLanguage}>{person.language}</Text>
-        </View>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Chat with ${person.name}`}
-        onPress={onPress}
-        style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
-      >
-        <MessageCircle size={11} color="#FFFFFF" fill="#FFFFFF" />
-        <Text style={styles.chatButtonText}>Chat</Text>
-      </Pressable>
-    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Chat with ${person.name}`} onPress={onPress} style={styles.chatCard}>
+      <View style={styles.chatAvatar}><ProfileAvatar {...person} /><View style={styles.smallOnline} /></View>
+      <Text numberOfLines={1} style={styles.chatName}>{person.name}</Text><Text numberOfLines={1} style={styles.chatLanguage}>{person.language}</Text>
+    </Pressable>
   );
 }
 function SectionTitle({ title, subtitle, isNew, onPress }) {
@@ -198,12 +172,24 @@ export default function HomeScreen({navigation}) {
   const [filter, setFilter] = useState('For You');
   const [claimed, setClaimed] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [people, setPeople] = useState(PEOPLE);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
   React.useEffect(() => {
     getMyProfile().then(setProfile).catch(() => {});
   }, []);
+  React.useEffect(() => {
+    const language = filter === 'For You' ? undefined : undefined;
+    getDiscoverProfiles({page: 1, limit: 12, language})
+      .then(data => {
+        const livePeople = filter === 'Online' ? data.users.filter(user => user.isOnline) : data.users;
+        if (livePeople.length) {
+          setPeople(livePeople);
+        }
+      })
+      .catch(() => {});
+  }, [filter]);
   const openDrawer = () => {
     setDrawerOpen(true);
     Animated.spring(drawerX, {toValue: 0, useNativeDriver: true, damping: 22, stiffness: 190}).start();
@@ -335,11 +321,11 @@ export default function HomeScreen({navigation}) {
           onPress={() => preview('More profiles')}
         />
         <View style={styles.cardRow}>
-          {PEOPLE.map(person => (
+          {people.slice(0, 3).map(person => (
             <CallCard
-              key={person.name}
+              key={person._id || person.firebaseUid || person.name}
               person={person}
-              onPress={() => preview('Voice calling')}
+              onPress={type => preview(`${type} calling`)}
             />
           ))}
         </View>
@@ -358,6 +344,12 @@ export default function HomeScreen({navigation}) {
             />
           ))}
         </View>
+        <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
+          <Gradient from="#3D255F" to="#8D39E8" radius={15} />
+          <Text style={styles.crown}>♛</Text>
+          <View style={styles.premiumCopy}><Text style={styles.premiumTitle}>Go Premium</Text><Text style={styles.premiumText}>Get more visibility, unlock filters{`\n`}and enjoy better matches.</Text></View>
+          <View style={styles.upgrade}><Text style={styles.upgradeText}>Upgrade</Text><ChevronRight size={15} color="#FFFFFF" /></View>
+        </Pressable>
       </ScrollView>
       <View style={styles.bottomBar}>
         <Gradient from="#17142F" to="#090B15" radius={22} />
@@ -410,9 +402,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   ambient: { position: 'absolute', top: 0, left: 0, right: 0, height: 180 },
   content: {
-    paddingHorizontal: 22,
-    paddingTop: 10,
-    paddingBottom: 24,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 18,
     width: '100%',
     maxWidth: 520,
     alignSelf: 'center',
@@ -421,7 +413,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   headerProfile: {flexDirection: 'row', alignItems: 'center', gap: 10, maxWidth: '54%'},
   headerAvatar: {width: 47, height: 47, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: '#25E989'},
@@ -463,7 +455,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#A265DE',
     borderRadius: 17,
-    padding: 12,
+    padding: 10,
     overflow: 'hidden',
     shadowColor: '#A447FA',
     shadowOpacity: 0.25,
@@ -530,10 +522,10 @@ const styles = StyleSheet.create({
   },
   timerText: { fontSize: 9, color: '#C9BBD9' },
   timerBold: { color: '#F1EAF8', fontWeight: '700' },
-  filters: { flexDirection: 'row', gap: 10, marginTop: 22 },
+  filters: { flexDirection: 'row', gap: 8, marginTop: 16 },
   filter: {
     flex: 1,
-    minHeight: 51,
+    minHeight: 40,
     borderRadius: 13,
     borderWidth: 1,
     borderColor: '#2D2B41',
@@ -551,12 +543,12 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   filterLabel: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#EEE7FA' },
-  sectionHeading: { marginTop: 28, marginBottom: 14 },
+  sectionHeading: { marginTop: 18, marginBottom: 9 },
   sectionLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 20,
-    lineHeight: 27,
+    fontSize: 19,
+    lineHeight: 24,
     color: '#E8D7FF',
   },
   subtitle: {
@@ -573,11 +565,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
     borderWidth: 1,
     borderColor: '#36334C',
-    borderRadius: 17,
-    padding: 9,
+    borderRadius: 15,
+    padding: 0,
     overflow: 'hidden',
   },
-  portrait: { width: '100%', aspectRatio: 1, maxHeight: 140 },
+  portrait: { width: '100%', aspectRatio: 0.91, maxHeight: 160, overflow: 'hidden' },
   online: {
     position: 'absolute',
     right: 3,
@@ -589,16 +581,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#398C77',
   },
+  presenceBadge: {position: 'absolute', top: 7, left: 7, backgroundColor: 'rgba(17,18,29,0.72)', borderRadius: 9, paddingHorizontal: 6, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 3},
+  presenceDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#19E58A'},
+  offlineDot: {backgroundColor: '#8A8493'},
+  presenceText: {fontSize: 8, color: '#FFFFFF'},
   personNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 3,
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
   },
   personName: {
     color: '#FFFFFF',
     fontFamily: 'Poppins-SemiBold',
-    fontSize: 12,
+    fontSize: 13,
     flexShrink: 1,
   },
   age: { color: '#DDD8EA', fontSize: 10 },
@@ -614,7 +611,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 3,
-    marginTop: 3,
+    marginTop: 4,
+    paddingHorizontal: 8,
   },
   languageTag: {
     borderRadius: 8,
@@ -623,15 +621,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   languageText: { fontSize: 8, color: '#D1CDDF' },
-  bio: { fontSize: 8, color: '#DDD7E8', marginTop: 7, marginBottom: 7 },
-  callButton: {
-    height: 33,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  callLabel: { color: '#FFFFFF', fontFamily: 'Poppins-Medium', fontSize: 10 },
+  bio: { fontSize: 8, color: '#DDD7E8', marginTop: 6, marginBottom: 7, paddingHorizontal: 8 },
+  callActions: {flexDirection: 'row', gap: 7, paddingHorizontal: 8, paddingBottom: 10},
+  videoButton: {flex: 1, minHeight: 45, borderRadius: 20, backgroundColor: '#9144F4', alignItems: 'center', justifyContent: 'center', gap: 2},
+  voiceButton: {flex: 1, minHeight: 45, borderRadius: 20, backgroundColor: '#F13D8B', alignItems: 'center', justifyContent: 'center', gap: 2},
+  actionText: {color: '#FFFFFF', fontSize: 9, fontFamily: 'Poppins-Medium'},
   pressed: { opacity: 0.7 },
   newBadge: {
     borderWidth: 1,
@@ -642,18 +636,8 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   newText: { color: '#05E4A2', fontSize: 9 },
-  chatCard: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#292A40',
-    padding: 8,
-    overflow: 'hidden',
-  },
-  chatTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  chatAvatar: { width: '48%', aspectRatio: 1 },
-  chatDetails: { flex: 1 },
+  chatCard: {width: '16.66%', alignItems: 'center'},
+  chatAvatar: {width: 47, height: 47, borderRadius: 24, overflow: 'hidden'},
   smallOnline: {
     position: 'absolute',
     right: 0,
@@ -663,21 +647,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#15E787',
   },
-  chatName: { fontFamily: 'Poppins-Medium', color: '#F1EAF8', fontSize: 9 },
-  chatLanguage: { color: '#AFA8C4', fontSize: 8, marginTop: 2 },
-  chatButton: {
-    alignSelf: 'flex-end',
-    minHeight: 24,
-    borderRadius: 14,
-    backgroundColor: '#3B285F',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    marginTop: 2,
-  },
-  chatButtonText: { fontSize: 9, color: '#FFFFFF' },
+  chatName: {fontFamily: 'Poppins-Medium', color: '#F1EAF8', fontSize: 9, marginTop: 5, maxWidth: '100%'},
+  chatLanguage: {color: '#AFA8C4', fontSize: 8, marginTop: 1, maxWidth: '100%'},
+  premiumBanner: {height: 66, marginTop: 24, borderRadius: 15, borderWidth: 1, borderColor: '#9E5CEB', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12},
+  crown: {fontSize: 34, color: '#FFD643', marginRight: 9},
+  premiumCopy: {flex: 1},
+  premiumTitle: {color: '#FFE549', fontFamily: 'Poppins-SemiBold', fontSize: 15},
+  premiumText: {color: '#F1DFFF', fontSize: 8, lineHeight: 11, marginTop: 1},
+  upgrade: {minWidth: 87, height: 33, borderRadius: 18, backgroundColor: '#A654FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2},
+  upgradeText: {color: '#FFFFFF', fontFamily: 'Poppins-Medium', fontSize: 11},
   bottomBar: {
     marginHorizontal: 8,
     paddingTop: 12,

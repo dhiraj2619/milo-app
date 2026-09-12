@@ -12,6 +12,14 @@ export async function getMyProfile() {
   return response.data.data.user;
 }
 
+export async function getDiscoverProfiles({page = 1, limit = 12, language} = {}) {
+  const response = await api.get('/users/discover', {
+    headers: {Authorization: `Bearer ${await token()}`},
+    params: {page, limit, ...(language ? {language} : {})},
+  });
+  return response.data.data;
+}
+
 export async function updateMyProfile(profile) {
   const response = await api.patch('/users/me', profile, {headers: {Authorization: `Bearer ${await token()}`}});
   return response.data.data.user;
