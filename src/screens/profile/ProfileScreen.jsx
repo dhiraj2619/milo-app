@@ -2,11 +2,12 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, Pressable, ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary} from 'react-native-image-picker';
-import {ArrowLeft, Camera, Check, Pencil, RefreshCw} from 'lucide-react-native';
+import {ArrowLeft, Camera, Check, LogOut, Pencil, RefreshCw} from 'lucide-react-native';
 import AppButton from '../../components/ui/AppButton';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import {getMyProfile, updateMyProfile} from '../../services/userService';
 import {useToast} from '../../components/ui/ToastProvider';
+import {logout} from '../../services/authService';
 
 const AVATARS = [
   {avatarSeed: 'milo-lavender', background: '#B996FF', hair: '#392323', shirt: '#A45EEB'},
@@ -24,6 +25,7 @@ export default function ProfileScreen({navigation}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [localPhoto, setLocalPhoto] = useState(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const load = useCallback(async () => {
     try { setProfile(await getMyProfile()); }
@@ -49,6 +51,18 @@ export default function ProfileScreen({navigation}) {
     finally { setSaving(false); }
   };
 
+  const handleLogout = () => {
+    if (loggingOut) { return; }
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Logout', style: 'destructive', onPress: async () => {
+        setLoggingOut(true);
+        try { await logout(); }
+        catch (error) { setLoggingOut(false); Alert.alert('Logout failed', error.message || 'Please try again.'); }
+      }},
+    ]);
+  };
+
   const avatar = selected || profile?.avatarStyle || {avatarSeed: profile?.avatarSeed || 'milo-user'};
   return <SafeAreaView style={styles.screen}>
     <StatusBar barStyle="light-content" />
@@ -63,10 +77,12 @@ export default function ProfileScreen({navigation}) {
       <AppButton title="Save avatar" onPress={saveAvatar} loading={saving} disabled={!selected || saving} style={styles.button} />
       <View style={styles.info}><View><Text style={styles.infoLabel}>Gender</Text><Text style={styles.infoValue}>{profile?.gender || '—'}</Text></View><View><Text style={styles.infoLabel}>Languages</Text><Text style={styles.infoValue}>{profile?.languages?.join(', ') || '—'}</Text></View><Pencil size={17} color="#B275FF" /></View>
       <Pressable onPress={() => {setSelected(AVATARS[Math.floor(Math.random() * AVATARS.length)]);}} style={styles.random}><RefreshCw size={16} color="#C77CFF" /><Text style={styles.randomText}>Try a random avatar</Text></Pressable>
+      <Pressable disabled={loggingOut} onPress={handleLogout} style={[styles.logoutButton, loggingOut && styles.disabled]}><LogOut size={18} color="#FF7894" /><Text style={styles.logoutText}>{loggingOut ? 'Logging out...' : 'Logout'}</Text></Pressable>
     </ScrollView>
   </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
   screen:{flex:1,backgroundColor:'#09080F'}, header:{height:58,paddingHorizontal:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, back:{width:40,height:40,alignItems:'center',justifyContent:'center'}, title:{color:'#FFF',fontFamily:'Poppins-SemiBold',fontSize:19}, content:{padding:24,paddingTop:14,paddingBottom:40,alignItems:'center'}, photoWrap:{width:142,height:142,borderRadius:71,overflow:'hidden',borderWidth:3,borderColor:'#A95CFF',backgroundColor:'#211933'}, camera:{position:'absolute',right:3,bottom:3,width:39,height:39,borderRadius:20,backgroundColor:'#8B40EE',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#09080F'}, name:{color:'#FFF',fontFamily:'Poppins-SemiBold',fontSize:25,marginTop:17}, phone:{color:'#BDB5CB',fontSize:13,marginTop:3}, sectionTitle:{alignSelf:'stretch',color:'#F7F2FD',fontFamily:'Poppins-SemiBold',fontSize:20,marginTop:38}, copy:{alignSelf:'stretch',color:'#B9B1C5',fontSize:13,lineHeight:20,marginTop:5}, avatarGrid:{alignSelf:'stretch',flexDirection:'row',flexWrap:'wrap',gap:14,marginTop:20}, avatarOption:{width:'29%',aspectRatio:1,borderRadius:35,overflow:'hidden',borderWidth:2,borderColor:'#373040'}, selected:{borderColor:'#B66BFF'}, check:{position:'absolute',right:2,bottom:2,width:23,height:23,borderRadius:12,backgroundColor:'#9350F5',alignItems:'center',justifyContent:'center'}, button:{marginTop:26}, info:{alignSelf:'stretch',marginTop:30,backgroundColor:'#17141F',borderColor:'#342E3F',borderWidth:1,borderRadius:18,padding:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, infoLabel:{color:'#AFA6BF',fontSize:11}, infoValue:{color:'#FFF',fontSize:14,textTransform:'capitalize',marginTop:4,maxWidth:210}, random:{marginTop:24,flexDirection:'row',gap:8,alignItems:'center'}, randomText:{color:'#C77CFF',fontFamily:'Poppins-Medium',fontSize:14},
+  logoutButton:{height:54,alignSelf:'stretch',marginTop:38,marginBottom:18,borderRadius:16,borderWidth:1,borderColor:'#633047',backgroundColor:'#281522',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, logoutText:{color:'#FF7894',fontFamily:'Poppins-Medium',fontSize:15}, disabled:{opacity:0.55},
 });

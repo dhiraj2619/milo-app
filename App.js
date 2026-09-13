@@ -13,6 +13,7 @@ const App = () => {
   const [sessionReady, setSessionReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const finishSplash = useCallback(() => setShowSplash(false), []);
+  const handleProfileCompleted = useCallback(() => setSignedIn(true), []);
   useEffect(() => {
     const unsubscribe = getAuth().onAuthStateChanged(async user => {
       if (!user) {
@@ -38,7 +39,7 @@ const App = () => {
       <ToastProvider>
       {showSplash || !sessionReady ? <SplashScreen onFinish={finishSplash} /> : (
         <NavigationContainer>
-          <RootNavigator signedIn={signedIn} />
+          <RootNavigator signedIn={signedIn} onProfileCompleted={handleProfileCompleted} />
         </NavigationContainer>
       )}
       </ToastProvider>

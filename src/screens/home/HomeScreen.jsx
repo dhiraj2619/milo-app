@@ -29,8 +29,11 @@ import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
+import { getAuth, getIdToken } from '@react-native-firebase/auth';
+import { io } from 'socket.io-client';
+import { SERVER_URL } from '../../config/config';
 
-const PEOPLE = [
+/* const PEOPLE = [
   {
     name: 'Aanya',
     age: 22,
@@ -89,7 +92,7 @@ const CHATS = [
   {name: 'Meera', language: 'English', background: '#FFB2D3', hair: '#45231F', shirt: '#D96A9D'},
   {name: 'Kabir', language: 'Hindi', gender: 'male', background: '#A6D4FF', hair: '#352720', shirt: '#4385B7', glasses: true},
   {name: 'Pooja', language: 'Tamil', background: '#E28CDE', hair: '#302020', shirt: '#B845B0'},
-];
+]; */
 const FILTERS = [
   { label: 'For You', icon: Star },
   { label: 'Online' },
@@ -104,6 +107,7 @@ const TABS = [
 
 function CallCard({ person, onPress }) {
   const avatar = person.avatarStyle || person;
+  const isOffline = person.isOnline !== true;
   return (
     <View style={styles.callCard}>
       <Gradient from="#25273C" to="#151321" radius={17} />
@@ -130,15 +134,16 @@ function CallCard({ person, onPress }) {
         ))}
       </View>
       <Text numberOfLines={1} style={styles.bio}>{person.bio || 'Ready to connect ✨'}</Text>
-      <View style={styles.callActions}><Pressable accessibilityLabel={`Video call ${person.nickname || person.name}`} onPress={() => onPress('Video')} style={styles.videoButton}><Video size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Video</Text></Pressable><Pressable accessibilityLabel={`Voice call ${person.nickname || person.name}`} onPress={() => onPress('Voice')} style={styles.voiceButton}><Phone size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Voice</Text></Pressable></View>
+      <View style={styles.callActions}><Pressable disabled={isOffline} accessibilityState={{disabled: isOffline}} accessibilityLabel={`Video call ${person.nickname || person.name}`} onPress={() => onPress('Video')} style={[styles.videoButton, isOffline && styles.disabledAction]}><Video size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Video</Text></Pressable><Pressable disabled={isOffline} accessibilityState={{disabled: isOffline}} accessibilityLabel={`Voice call ${person.nickname || person.name}`} onPress={() => onPress('Voice')} style={[styles.voiceButton, isOffline && styles.disabledAction]}><Phone size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Voice</Text></Pressable></View>
     </View>
   );
 }
 function ChatCard({ person, onPress }) {
+  const isOffline = person.isOnline !== true;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Chat with ${person.name}`} onPress={onPress} style={styles.chatCard}>
-      <View style={styles.chatAvatar}><ProfileAvatar {...person} /><View style={styles.smallOnline} /></View>
-      <Text numberOfLines={1} style={styles.chatName}>{person.name}</Text><Text numberOfLines={1} style={styles.chatLanguage}>{person.language}</Text>
+    <Pressable disabled={isOffline} accessibilityRole="button" accessibilityState={{disabled: isOffline}} accessibilityLabel={`Chat with ${person.nickname}`} onPress={onPress} style={[styles.chatCard, isOffline && styles.disabledCard]}>
+      <View style={styles.chatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={person.nickname} photoUrl={person.photoUrl} /><View style={[styles.smallOnline, isOffline && styles.offlineDot]} /></View>
+      <Text numberOfLines={1} style={styles.chatName}>{person.nickname}</Text><Text numberOfLines={1} style={styles.chatLanguage}>{person.languages?.[0] || 'MILO member'}</Text>
     </Pressable>
   );
 }
@@ -172,7 +177,7 @@ export default function HomeScreen({navigation}) {
   const [filter, setFilter] = useState('For You');
   const [claimed, setClaimed] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [people, setPeople] = useState(PEOPLE);
+  const [people, setPeople] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
@@ -180,16 +185,31 @@ export default function HomeScreen({navigation}) {
     getMyProfile().then(setProfile).catch(() => {});
   }, []);
   React.useEffect(() => {
-    const language = filter === 'For You' ? undefined : undefined;
-    getDiscoverProfiles({page: 1, limit: 12, language})
-      .then(data => {
-        const livePeople = filter === 'Online' ? data.users.filter(user => user.isOnline) : data.users;
-        if (livePeople.length) {
-          setPeople(livePeople);
-        }
-      })
-      .catch(() => {});
-  }, [filter]);
+    let mounted = true;
+    getDiscoverProfiles({page: 1, limit: 30})
+      .then(data => mounted && setPeople(data.users || []))
+      .catch(() => mounted && setPeople([]));
+    return () => { mounted = false; };
+  }, []);
+  React.useEffect(() => {
+    let socket;
+    let mounted = true;
+    const connectPresence = async () => {
+      try {
+        const currentUser = getAuth().currentUser;
+        if (!currentUser) return;
+        const idToken = await getIdToken(currentUser);
+        socket = io(SERVER_URL.replace(/\/+$/, ''), {auth: {token: idToken}, transports: ['websocket']});
+        socket.on('user:presence', presence => {
+          if (!mounted) return;
+          setPeople(current => current.map(person => person.firebaseUid === presence.firebaseUid ? {...person, isOnline: presence.isOnline, lastSeen: presence.lastSeen || null} : person));
+        });
+      } catch (_) {}
+    };
+    connectPresence();
+    return () => { mounted = false; socket?.disconnect(); };
+  }, []);
+  const visiblePeople = filter === 'Online' ? people.filter(person => person.isOnline === true) : people;
   const openDrawer = () => {
     setDrawerOpen(true);
     Animated.spring(drawerX, {toValue: 0, useNativeDriver: true, damping: 22, stiffness: 190}).start();
@@ -321,7 +341,7 @@ export default function HomeScreen({navigation}) {
           onPress={() => preview('More profiles')}
         />
         <View style={styles.cardRow}>
-          {people.slice(0, 3).map(person => (
+          {visiblePeople.slice(0, 3).map(person => (
             <CallCard
               key={person._id || person.firebaseUid || person.name}
               person={person}
@@ -336,7 +356,7 @@ export default function HomeScreen({navigation}) {
           onPress={() => preview('More chats')}
         />
         <View style={styles.cardRow}>
-          {CHATS.map(person => (
+          {visiblePeople.slice(0, 6).map(person => (
             <ChatCard
               key={person.name}
               person={person}
@@ -625,6 +645,7 @@ const styles = StyleSheet.create({
   callActions: {flexDirection: 'row', gap: 7, paddingHorizontal: 8, paddingBottom: 10},
   videoButton: {flex: 1, minHeight: 45, borderRadius: 20, backgroundColor: '#9144F4', alignItems: 'center', justifyContent: 'center', gap: 2},
   voiceButton: {flex: 1, minHeight: 45, borderRadius: 20, backgroundColor: '#F13D8B', alignItems: 'center', justifyContent: 'center', gap: 2},
+  disabledAction: {opacity: 0.35},
   actionText: {color: '#FFFFFF', fontSize: 9, fontFamily: 'Poppins-Medium'},
   pressed: { opacity: 0.7 },
   newBadge: {
@@ -637,6 +658,7 @@ const styles = StyleSheet.create({
   },
   newText: { color: '#05E4A2', fontSize: 9 },
   chatCard: {width: '16.66%', alignItems: 'center'},
+  disabledCard: {opacity: 0.45},
   chatAvatar: {width: 47, height: 47, borderRadius: 24, overflow: 'hidden'},
   smallOnline: {
     position: 'absolute',

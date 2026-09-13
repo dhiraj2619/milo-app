@@ -6,13 +6,13 @@ import ProfileSuccessScreen from '../screens/auth/ProfileSuccessScreen';
 
 const Stack = createNativeStackNavigator();
 
-const AuthNavigator = () => {
+const AuthNavigator = ({onProfileCompleted}) => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="OTP" component={OTPScreen} />
+      <Stack.Screen name="OTP">{props => <OTPScreen {...props} onProfileCompleted={onProfileCompleted} />}</Stack.Screen>
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-      <Stack.Screen name="ProfileSuccess" component={ProfileSuccessScreen} options={{gestureEnabled: false}} />
+      <Stack.Screen name="ProfileSuccess">{props => <ProfileSuccessScreen {...props} onProfileCompleted={onProfileCompleted} />}</Stack.Screen>
     </Stack.Navigator>
   );
 };

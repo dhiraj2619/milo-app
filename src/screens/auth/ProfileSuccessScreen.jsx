@@ -6,7 +6,7 @@ import AppButton from '../../components/ui/AppButton';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-export default function ProfileSuccessScreen({navigation}) {
+export default function ProfileSuccessScreen({navigation, onProfileCompleted}) {
   const scale = useRef(new Animated.Value(0.7)).current;
   const stroke = useRef(new Animated.Value(100)).current;
 
@@ -31,13 +31,13 @@ export default function ProfileSuccessScreen({navigation}) {
     AccessibilityInfo.isReduceMotionEnabled().then(animate).catch(() => animate(true));
     const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', animate);
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
-      navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
+      onProfileCompleted?.();
       return true;
     });
     return () => {disposed = true; animation?.stop(); motion.remove(); back.remove();};
-  }, [navigation, scale, stroke]);
+  }, [navigation, onProfileCompleted, scale, stroke]);
 
-  const continueToHome = () => navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
+  const continueToHome = () => onProfileCompleted?.();
 
   return <SafeAreaView style={styles.screen}>
     <StatusBar barStyle="light-content" />

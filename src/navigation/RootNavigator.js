@@ -4,9 +4,9 @@ import AuthNavigator from './AuthNavigator';
 
 const Stack = createNativeStackNavigator();
 
-const RootNavigator = ({signedIn}) => (
+const RootNavigator = ({signedIn, onProfileCompleted}) => (
   <Stack.Navigator screenOptions={{headerShown: false}}>
-    {signedIn ? <Stack.Screen name="Main" component={MainNavigator} /> : <Stack.Screen name="Auth" component={AuthNavigator} />}
+    {signedIn ? <Stack.Screen name="Main" component={MainNavigator} /> : <Stack.Screen name="Auth">{props => <AuthNavigator {...props} onProfileCompleted={onProfileCompleted} />}</Stack.Screen>}
   </Stack.Navigator>
 );
 

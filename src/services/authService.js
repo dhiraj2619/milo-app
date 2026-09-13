@@ -7,7 +7,7 @@ import {
   PhoneAuthProvider,
 } from '@react-native-firebase/auth';
 import api from './api';
-import {saveSessionProfile} from './sessionService';
+import {clearSessionProfile, saveSessionProfile} from './sessionService';
 
 let pendingConfirmation = null;
 let pendingPhone = null;
@@ -73,4 +73,11 @@ export async function verifyPhoneOTP(otp, phone) {
     await saveSessionProfile(result.user);
   }
   return result;
+}
+
+export async function logout() {
+  pendingConfirmation = null;
+  pendingPhone = null;
+  await signOut(getAuth());
+  await clearSessionProfile();
 }

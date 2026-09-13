@@ -9,7 +9,7 @@ import {useToast} from '../../components/ui/ToastProvider';
 
 const OTP_LENGTH = 6;
 
-export default function OTPScreen({navigation, route}) {
+export default function OTPScreen({navigation, route, onProfileCompleted}) {
   const toast = useToast();
   const phone = route?.params?.phone || '';
   const [verifying, setVerifying] = useState(false);
@@ -83,7 +83,7 @@ export default function OTPScreen({navigation, route}) {
       if (result.profileCompleted !== true || !result.user?._id || !result.user?.nickname || !result.user?.gender || !result.user?.languages?.length) {
         navigation.replace('ProfileSetup', {profile: result.user || null});
       } else {
-        navigation.getParent()?.reset({index: 0, routes: [{name: 'Main'}]});
+        onProfileCompleted?.();
       }
     } catch (error) {
       const messages = {
