@@ -1,8 +1,8 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, Pressable, ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {Alert, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {launchImageLibrary} from 'react-native-image-picker';
-import {ArrowLeft, Camera, Check, LogOut, Pencil, RefreshCw} from 'lucide-react-native';
+import {ArrowLeft, Camera, Check, Gift, LogOut, Pencil, RefreshCw, Share2} from 'lucide-react-native';
 import AppButton from '../../components/ui/AppButton';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import {getMyProfile, updateMyProfile} from '../../services/userService';
@@ -62,6 +62,12 @@ export default function ProfileScreen({navigation}) {
       }},
     ]);
   };
+  const shareReferral = async () => {
+    if (!profile?.referralCode) { return; }
+    try {
+      await Share.share({message: `Join me on MILO! Use my referral code ${profile.referralCode} when you register. You get 100 bonus coins and I get 200 coins.`});
+    } catch (_) {}
+  };
 
   const avatar = selected || profile?.avatarStyle || {avatarSeed: profile?.avatarSeed || 'milo-user'};
   return <SafeAreaView style={styles.screen}>
@@ -71,6 +77,8 @@ export default function ProfileScreen({navigation}) {
       <View style={styles.photoWrap}><ProfileAvatar {...avatar} photoUrl={localPhoto || profile?.photoUrl} /><Pressable disabled={saving} onPress={choosePhoto} style={styles.camera}><Camera size={18} color="#FFF" /></Pressable></View>
       <Text style={styles.name}>{profile?.nickname || (loading ? 'Loading…' : 'MILO user')}</Text>
       <Text style={styles.phone}>{profile?.phone || ''}</Text>
+      <View style={styles.coinCard}><Gift size={22} color="#FFD84E" /><View style={styles.coinCopy}><Text style={styles.coinLabel}>MILO coins</Text><Text style={styles.coinBalance}>{profile?.coinBalance ?? 0}</Text></View></View>
+      {!!profile?.referralCode && <Pressable onPress={shareReferral} style={styles.referralCard}><View><Text style={styles.referralLabel}>Invite friends · earn 200 coins</Text><Text style={styles.referralCode}>{profile.referralCode}</Text><Text style={styles.referralHint}>Your friend receives 100 bonus coins.</Text></View><Share2 size={21} color="#FFFFFF" /></Pressable>}
       <Text style={styles.sectionTitle}>Choose your avatar</Text>
       <Text style={styles.copy}>Pick a character now. You can upload your own photo anytime.</Text>
       <View style={styles.avatarGrid}>{AVATARS.map(item => <Pressable key={item.avatarSeed} onPress={() => setSelected(item)} style={[styles.avatarOption, (selected?.avatarSeed || profile?.avatarSeed) === item.avatarSeed && styles.selected]}><ProfileAvatar {...item} /><View style={styles.check}>{(selected?.avatarSeed || profile?.avatarSeed) === item.avatarSeed && <Check size={13} color="#FFF" strokeWidth={3} />}</View></Pressable>)}</View>
@@ -83,6 +91,6 @@ export default function ProfileScreen({navigation}) {
 }
 
 const styles = StyleSheet.create({
-  screen:{flex:1,backgroundColor:'#09080F'}, header:{height:58,paddingHorizontal:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, back:{width:40,height:40,alignItems:'center',justifyContent:'center'}, title:{color:'#FFF',fontFamily:'Poppins-SemiBold',fontSize:19}, content:{padding:24,paddingTop:14,paddingBottom:40,alignItems:'center'}, photoWrap:{width:142,height:142,borderRadius:71,overflow:'hidden',borderWidth:3,borderColor:'#A95CFF',backgroundColor:'#211933'}, camera:{position:'absolute',right:3,bottom:3,width:39,height:39,borderRadius:20,backgroundColor:'#8B40EE',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#09080F'}, name:{color:'#FFF',fontFamily:'Poppins-SemiBold',fontSize:25,marginTop:17}, phone:{color:'#BDB5CB',fontSize:13,marginTop:3}, sectionTitle:{alignSelf:'stretch',color:'#F7F2FD',fontFamily:'Poppins-SemiBold',fontSize:20,marginTop:38}, copy:{alignSelf:'stretch',color:'#B9B1C5',fontSize:13,lineHeight:20,marginTop:5}, avatarGrid:{alignSelf:'stretch',flexDirection:'row',flexWrap:'wrap',gap:14,marginTop:20}, avatarOption:{width:'29%',aspectRatio:1,borderRadius:35,overflow:'hidden',borderWidth:2,borderColor:'#373040'}, selected:{borderColor:'#B66BFF'}, check:{position:'absolute',right:2,bottom:2,width:23,height:23,borderRadius:12,backgroundColor:'#9350F5',alignItems:'center',justifyContent:'center'}, button:{marginTop:26}, info:{alignSelf:'stretch',marginTop:30,backgroundColor:'#17141F',borderColor:'#342E3F',borderWidth:1,borderRadius:18,padding:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, infoLabel:{color:'#AFA6BF',fontSize:11}, infoValue:{color:'#FFF',fontSize:14,textTransform:'capitalize',marginTop:4,maxWidth:210}, random:{marginTop:24,flexDirection:'row',gap:8,alignItems:'center'}, randomText:{color:'#C77CFF',fontFamily:'Poppins-Medium',fontSize:14},
+  screen:{flex:1,backgroundColor:'#09080F'}, header:{height:58,paddingHorizontal:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, back:{width:40,height:40,alignItems:'center',justifyContent:'center'}, title:{color:'#FFF',fontFamily:'Poppins-SemiBold',fontSize:19}, content:{padding:24,paddingTop:14,paddingBottom:40,alignItems:'center'}, photoWrap:{width:142,height:142,borderRadius:71,overflow:'hidden',borderWidth:3,borderColor:'#A95CFF',backgroundColor:'#211933'}, camera:{position:'absolute',right:3,bottom:3,width:39,height:39,borderRadius:20,backgroundColor:'#8B40EE',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#09080F'}, name:{color:'#FFF',fontFamily:'Poppins-SemiBold',fontSize:25,marginTop:17}, phone:{color:'#BDB5CB',fontSize:13,marginTop:3}, coinCard:{alignSelf:'stretch',marginTop:22,borderRadius:16,borderWidth:1,borderColor:'#76562A',backgroundColor:'#281F14',padding:15,flexDirection:'row',alignItems:'center',gap:11},coinCopy:{flex:1},coinLabel:{color:'#D8C7A4',fontSize:12},coinBalance:{color:'#FFE160',fontFamily:'Poppins-SemiBold',fontSize:23,marginTop:1},referralCard:{alignSelf:'stretch',marginTop:12,borderRadius:16,backgroundColor:'#7130D0',padding:16,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},referralLabel:{color:'#F2E5FF',fontFamily:'Poppins-Medium',fontSize:13},referralCode:{color:'#FFFFFF',fontFamily:'Poppins-SemiBold',fontSize:20,letterSpacing:1,marginTop:4},referralHint:{color:'#E2CBFF',fontSize:10,marginTop:3}, sectionTitle:{alignSelf:'stretch',color:'#F7F2FD',fontFamily:'Poppins-SemiBold',fontSize:20,marginTop:38}, copy:{alignSelf:'stretch',color:'#B9B1C5',fontSize:13,lineHeight:20,marginTop:5}, avatarGrid:{alignSelf:'stretch',flexDirection:'row',flexWrap:'wrap',gap:14,marginTop:20}, avatarOption:{width:'29%',aspectRatio:1,borderRadius:35,overflow:'hidden',borderWidth:2,borderColor:'#373040'}, selected:{borderColor:'#B66BFF'}, check:{position:'absolute',right:2,bottom:2,width:23,height:23,borderRadius:12,backgroundColor:'#9350F5',alignItems:'center',justifyContent:'center'}, button:{marginTop:26}, info:{alignSelf:'stretch',marginTop:30,backgroundColor:'#17141F',borderColor:'#342E3F',borderWidth:1,borderRadius:18,padding:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, infoLabel:{color:'#AFA6BF',fontSize:11}, infoValue:{color:'#FFF',fontSize:14,textTransform:'capitalize',marginTop:4,maxWidth:210}, random:{marginTop:24,flexDirection:'row',gap:8,alignItems:'center'}, randomText:{color:'#C77CFF',fontFamily:'Poppins-Medium',fontSize:14},
   logoutButton:{height:54,alignSelf:'stretch',marginTop:38,marginBottom:18,borderRadius:16,borderWidth:1,borderColor:'#633047',backgroundColor:'#281522',flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, logoutText:{color:'#FF7894',fontFamily:'Poppins-Medium',fontSize:15}, disabled:{opacity:0.55},
 });

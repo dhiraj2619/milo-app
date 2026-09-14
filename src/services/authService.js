@@ -19,11 +19,11 @@ function phoneAuthMessage(error) {
   return error?.message || 'Unable to send OTP. Please try again.';
 }
 
-export async function completeProfile({nickname, gender, languages, avatarSeed, avatarStyle}) {
+export async function completeProfile({nickname, gender, languages, avatarSeed, avatarStyle, referralCode}) {
   const user = getAuth().currentUser;
   if (!user) {throw new Error('Please sign in again to complete your profile.');}
   const idToken = await getIdToken(user);
-  const response = await api.post('/users/profile', {idToken, nickname, gender, languages, avatarSeed, avatarStyle});
+  const response = await api.post('/users/profile', {idToken, nickname, gender, languages, avatarSeed, avatarStyle, referralCode});
   const profile = response.data.data?.user;
   if (!response.data.success || !profile?._id || profile.profileCompleted !== true || profile.firebaseUid !== user.uid || profile.nickname !== nickname || profile.gender !== gender || !languages.every(language => profile.languages?.includes(language))) {
     throw new Error('Your profile could not be saved completely. Please try again.');

@@ -3,10 +3,12 @@ import {AccessibilityInfo, Animated, BackHandler, Easing, StatusBar, StyleSheet,
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg, {Circle, Defs, LinearGradient, Path, RadialGradient, Stop} from 'react-native-svg';
 import AppButton from '../../components/ui/AppButton';
+import {useToast} from '../../components/ui/ToastProvider';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-export default function ProfileSuccessScreen({navigation, onProfileCompleted}) {
+export default function ProfileSuccessScreen({navigation, onProfileCompleted, route}) {
+  const toast = useToast();
   const scale = useRef(new Animated.Value(0.7)).current;
   const stroke = useRef(new Animated.Value(100)).current;
 
@@ -36,6 +38,11 @@ export default function ProfileSuccessScreen({navigation, onProfileCompleted}) {
     });
     return () => {disposed = true; animation?.stop(); motion.remove(); back.remove();};
   }, [navigation, onProfileCompleted, scale, stroke]);
+
+  useEffect(() => {
+    const nickname = route.params?.nickname || 'there';
+    toast(`Hello ${nickname}! You received 100 welcome bonus coins.`);
+  }, [route.params?.nickname, toast]);
 
   const continueToHome = () => onProfileCompleted?.();
 

@@ -1,5 +1,6 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Pressable,
   ScrollView,
@@ -29,6 +30,7 @@ import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
+import {claimDailyCoins} from '../../services/coinService';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { io } from 'socket.io-client';
 import { SERVER_URL } from '../../config/config';
@@ -175,20 +177,44 @@ function SectionTitle({ title, subtitle, isNew, onPress }) {
 export default function HomeScreen({navigation}) {
   const toast = useToast();
   const [filter, setFilter] = useState('For You');
-  const [claimed, setClaimed] = useState(false);
+  const [claimingCoins, setClaimingCoins] = useState(false);
   const [profile, setProfile] = useState(null);
   const [people, setPeople] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [loadingPeople, setLoadingPeople] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
+  const claimDailyReward = async () => {
+    if (claimingCoins) return;
+    setClaimingCoins(true);
+    try {
+      const wallet = await claimDailyCoins();
+      setProfile(current => ({...current, coinBalance: wallet.coinBalance, lastDailyCoinClaimAt: wallet.claimedAt}));
+      toast('70 daily coins added to your wallet!');
+    } catch (error) {
+      toast(error.response?.data?.message || 'Your daily coins are not ready yet.');
+    } finally {
+      setClaimingCoins(false);
+    }
+  };
   React.useEffect(() => {
     getMyProfile().then(setProfile).catch(() => {});
   }, []);
   React.useEffect(() => {
     let mounted = true;
-    getDiscoverProfiles({page: 1, limit: 30})
-      .then(data => mounted && setPeople(data.users || []))
-      .catch(() => mounted && setPeople([]));
+    setLoadingPeople(true);
+    getDiscoverProfiles({page: 1, limit: 12})
+      .then(data => {
+        if (!mounted) return;
+        setPeople(data.users || []);
+        setPage(data.pagination?.page || 1);
+        setHasNextPage(!!data.pagination?.hasNextPage);
+      })
+      .catch(() => mounted && setPeople([]))
+      .finally(() => mounted && setLoadingPeople(false));
     return () => { mounted = false; };
   }, []);
   React.useEffect(() => {
@@ -210,6 +236,25 @@ export default function HomeScreen({navigation}) {
     return () => { mounted = false; socket?.disconnect(); };
   }, []);
   const visiblePeople = filter === 'Online' ? people.filter(person => person.isOnline === true) : people;
+  const loadMoreProfiles = async () => {
+    if (loadingMore || loadingPeople || !hasNextPage) return;
+    setLoadingMore(true);
+    try {
+      const data = await getDiscoverProfiles({page: page + 1, limit: 12});
+      setPeople(current => [...current, ...(data.users || [])]);
+      setPage(data.pagination?.page || page + 1);
+      setHasNextPage(!!data.pagination?.hasNextPage);
+    } catch (_) {
+      toast('Could not load more profiles. Please try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+  const onProfilesScroll = ({nativeEvent}) => {
+    const {contentOffset, contentSize, layoutMeasurement} = nativeEvent;
+    const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 180;
+    if (nearBottom) loadMoreProfiles();
+  };
   const openDrawer = () => {
     setDrawerOpen(true);
     Animated.spring(drawerX, {toValue: 0, useNativeDriver: true, damping: 22, stiffness: 190}).start();
@@ -230,6 +275,8 @@ export default function HomeScreen({navigation}) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
+        onScroll={onProfilesScroll}
+        scrollEventThrottle={200}
       >
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={openDrawer} style={styles.headerProfile}>
@@ -239,7 +286,7 @@ export default function HomeScreen({navigation}) {
           <View style={styles.headerActions}>
             <View style={styles.wallet}>
               <Coin size={21} />
-              <Text style={styles.balance}>{claimed ? 220 : 170}</Text>
+              <Text style={styles.balance}>{profile?.coinBalance ?? 0}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Add coins"
@@ -281,20 +328,17 @@ export default function HomeScreen({navigation}) {
           </View>
           <View style={styles.claimRow}>
             <Coin size={27} />
-            <Text style={styles.coinAmount}>50 coins</Text>
+            <Text style={styles.coinAmount}>70 coins</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: claimed }}
-              disabled={claimed}
-              onPress={() => {
-                setClaimed(true);
-                toast('50 demo coins claimed');
-              }}
+              accessibilityState={{ disabled: claimingCoins }}
+              disabled={claimingCoins}
+              onPress={claimDailyReward}
               style={styles.claimButton}
             >
               <Gradient from="#D25BFF" to="#6B25EE" radius={18} />
               <Text style={styles.claimText}>
-                {claimed ? 'Claimed' : 'Claim Now'}
+                {claimingCoins ? 'Claiming…' : 'Claim Now'}
               </Text>
               <ChevronRight size={16} color="#FFFFFF" />
             </Pressable>
@@ -302,7 +346,7 @@ export default function HomeScreen({navigation}) {
           <View style={styles.timer}>
             <Clock3 size={12} color="#C4B8D8" />
             <Text style={styles.timerText}>
-              Next reward in <Text style={styles.timerBold}>10h 18m 40s</Text>
+              Claim again after <Text style={styles.timerBold}>24 hours</Text>
             </Text>
           </View>
         </View>
@@ -349,6 +393,10 @@ export default function HomeScreen({navigation}) {
             />
           ))}
         </View>
+        {loadingPeople && <View style={styles.profilesStatus}><ActivityIndicator color="#B663FF" size="small" /><Text style={styles.statusText}>Finding people for you…</Text></View>}
+        {!loadingPeople && !visiblePeople.length && <View style={styles.emptyState}><Text style={styles.emptyTitle}>{filter === 'Online' ? 'No one is online yet' : 'No profiles available yet'}</Text><Text style={styles.emptyText}>Check back during active hours to meet new people.</Text></View>}
+        {loadingMore && <View style={styles.profilesStatus}><ActivityIndicator color="#B663FF" size="small" /><Text style={styles.statusText}>Loading more profiles…</Text></View>}
+        {!loadingPeople && !loadingMore && people.length > 0 && !hasNextPage && <Text style={styles.endText}>You’ve seen everyone for now.</Text>}
         <SectionTitle
           title="MILO Chat"
           subtitle="Start a chat before you call."
@@ -671,6 +719,12 @@ const styles = StyleSheet.create({
   },
   chatName: {fontFamily: 'Poppins-Medium', color: '#F1EAF8', fontSize: 9, marginTop: 5, maxWidth: '100%'},
   chatLanguage: {color: '#AFA8C4', fontSize: 8, marginTop: 1, maxWidth: '100%'},
+  profilesStatus: {minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 8, flexDirection: 'row'},
+  statusText: {color: '#BFB7CC', fontSize: 12},
+  emptyState: {marginTop: 10, borderRadius: 15, borderWidth: 1, borderColor: '#302B42', backgroundColor: '#161420', padding: 20, alignItems: 'center'},
+  emptyTitle: {color: '#F4ECFF', fontFamily: 'Poppins-Medium', fontSize: 15},
+  emptyText: {color: '#AAA3B6', fontSize: 11, textAlign: 'center', marginTop: 5},
+  endText: {color: '#888095', fontSize: 11, textAlign: 'center', marginTop: 14},
   premiumBanner: {height: 66, marginTop: 24, borderRadius: 15, borderWidth: 1, borderColor: '#9E5CEB', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12},
   crown: {fontSize: 34, color: '#FFD643', marginRight: 9},
   premiumCopy: {flex: 1},
