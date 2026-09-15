@@ -132,10 +132,11 @@ function GiftMini() {
   return <Text style={styles.giftMini}>🎁</Text>;
 }
 const TABS = [
-  { label: 'Home', icon: House },
-  { label: 'Chats', icon: MessageCircle },
-  { label: 'Calls', icon: Phone },
-  { label: 'Profile', icon: UserRound },
+  {label: 'Home', icon: House},
+  {label: 'Chats', icon: MessageCircle},
+  {label: 'MILO Special', icon: Sparkles},
+  {label: 'Connect', icon: Phone},
+  {label: 'Profile', icon: UserRound},
 ];
 
 const LANGUAGE_LABELS = {Hindi: 'हिंदी', Marathi: 'मराठी', Bengali: 'বাংলা', Tamil: 'தமிழ்', Telugu: 'తెలుగు', Gujarati: 'ગુજરાતી', Kannada: 'ಕನ್ನಡ', English: 'English'};
@@ -151,16 +152,18 @@ function ConnectProfileCard({person, cardWidth, onPress}) {
     <Pressable disabled={isOffline} onPress={() => onPress(person)} style={[styles.connectCallButton, isOffline && styles.disabledAction]}><Phone size={16} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.connectCallText}>Join Call</Text></Pressable>
   </View>;
 }
-function ChatCard({ person, onPress }) {
+function MiloChatCard({person, cardWidth, onPress}) {
   const isOffline = person.isOnline !== true;
-  return (
-    <Pressable disabled={isOffline} accessibilityRole="button" accessibilityState={{disabled: isOffline}} accessibilityLabel={`Chat with ${person.nickname}`} onPress={onPress} style={[styles.chatCard, isOffline && styles.disabledCard]}>
-      <View style={styles.chatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={person.nickname} photoUrl={person.photoUrl} /><View style={[styles.smallOnline, isOffline && styles.offlineDot]} /></View>
-      <Text numberOfLines={1} style={styles.chatName}>{person.nickname}</Text><Text numberOfLines={1} style={styles.chatLanguage}>{person.languages?.[0] || 'MILO member'}</Text>
-    </Pressable>
-  );
-}
-function WelcomeRewardModal({reward, onClose}) {
+  const name = person.nickname || person.name || 'MILO member';
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Chat with ${name}`} onPress={() => onPress(person)} style={[styles.miloChatCard, {width: cardWidth}]}>
+    <Gradient from="#45637F" to="#151A2B" radius={14} />
+    <View style={styles.miloChatTop}><View style={styles.presenceBadge}><View style={[styles.presenceDot, isOffline && styles.offlineDot]} /><Text style={styles.presenceText}>{isOffline ? 'Offline' : 'Online'}</Text></View><MoreHorizontal size={15} color="#EDE8F8" /></View>
+    <View style={styles.miloChatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /></View>
+    <Text numberOfLines={1} style={styles.miloChatName}>{name} {person.age || ''}</Text>
+    <Text numberOfLines={1} style={styles.miloChatLanguage}>{languageLabel(person.languages?.[0] || 'English')}</Text>
+    <View style={styles.miloChatButton}><MessageCircle size={14} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.miloChatButtonText}>Chat</Text></View>
+  </Pressable>;
+}function WelcomeRewardModal({reward, onClose}) {
   if (!reward) return null;
   return <Modal transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
     <View style={styles.welcomeOverlay}>
@@ -280,6 +283,7 @@ export default function HomeScreen({navigation}) {
   const visiblePeople = filter === 'Online' ? people.filter(person => person.isOnline === true) : people;
   const connectProfiles = React.useMemo(() => selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo'), [profile?.firebaseUid, profile?.phone, profile?.avatarSeed]);
   const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);
+  const miloChatCardWidth = Math.max(96, (screenWidth - 44) / 3);
   const loadMoreProfiles = async () => {
     if (loadingMore || loadingPeople || !hasNextPage) return;
     setLoadingMore(true);
@@ -427,15 +431,10 @@ export default function HomeScreen({navigation}) {
           isNew
           onPress={() => preview('More chats')}
         />
-        <View style={styles.cardRow}>
-          {visiblePeople.slice(0, 6).map(person => (
-            <ChatCard
-              key={person.name}
-              person={person}
-              onPress={() => preview('Chat')}
-            />
-          ))}
+        <View style={styles.miloChatRow}>
+          {visiblePeople.slice(0, 3).map(person => <MiloChatCard key={person._id || person.firebaseUid} person={person} cardWidth={miloChatCardWidth} onPress={selectedPerson => navigation.navigate('ChatConversation', {person: selectedPerson})} />)}
         </View>
+        {!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>{filter === 'Online' ? 'No registered members are online yet.' : 'Registered members will appear here.'}</Text>}
         <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
           <Gradient from="#3D255F" to="#8D39E8" radius={15} />
           <Text style={styles.crown}>♛</Text>
@@ -451,14 +450,14 @@ export default function HomeScreen({navigation}) {
             key={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: label === 'Home' }}
-            onPress={() => label === 'Profile' ? openDrawer() : label !== 'Home' && preview(label)}
+            onPress={() => label === 'Profile' ? openDrawer() : label === 'Chats' ? navigation.navigate('Chats') : label !== 'Home' && preview(label)}
             style={styles.navItem}
           >
             <View style={label === 'Home' && styles.homeGlow}>
               <Icon
                 size={23}
                 color={label === 'Home' ? '#BA5BFF' : '#BCB9CC'}
-                fill={label === 'Home' ? '#A449FA' : 'none'}
+                fill="none"
               />
               {label === 'Chats' && (
                 <View style={styles.navBadge}>
@@ -623,13 +622,22 @@ const styles = StyleSheet.create({
   connectCard: {height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#616F94', backgroundColor: '#1C2133', padding: 8},
   connectTop: {height: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2},
   connectMore: {width: 21, height: 21, borderRadius: 11, backgroundColor: 'rgba(10,9,22,0.46)', alignItems: 'center', justifyContent: 'center'},
-  connectAvatar: {position: 'absolute', left: 20, right: 20, top: 27, height: 106, overflow: 'hidden', borderRadius: 56, backgroundColor: '#CF91DF'},
-  connectName: {position: 'absolute', left: 10, right: 10, top: 136, fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14},
-  connectTags: {position: 'absolute', left: 10, top: 159, flexDirection: 'row', gap: 3},
+  connectAvatar: {position: 'absolute', left: '50%', marginLeft: -48, top: 27, width: 96, height: 96, overflow: 'hidden', borderRadius: 48, backgroundColor: 'transparent'},
+  connectName: {position: 'absolute', left: 10, right: 10, top: 130, fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14},
+  connectTags: {position: 'absolute', left: 10, top: 153, flexDirection: 'row', gap: 3},
   connectTag: {borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: 'rgba(24,10,48,0.5)'},
   connectTagText: {color: '#F2ECF9', fontFamily: 'Poppins-Medium', fontSize: 9},
   connectCallButton: {position: 'absolute', left: 8, right: 8, bottom: 9, height: 38, borderRadius: 20, backgroundColor: '#873BF1', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5},
   connectCallText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 11},
+  miloChatRow: {flexDirection: 'row', gap: 7},
+  miloChatCard: {height: 185, borderRadius: 14, borderWidth: 1, borderColor: '#465675', overflow: 'hidden', padding: 7},
+  miloChatTop: {height: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  miloChatAvatar: {width: 60, height: 60, borderRadius: 30, overflow: 'hidden', alignSelf: 'center', marginTop: 1, backgroundColor: '#A8D0F5'},
+  miloChatName: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 11, marginTop: 5},
+  miloChatLanguage: {fontFamily: 'Poppins-Medium', color: '#F3ECFB', fontSize: 11, marginTop: 4},
+  miloChatButton: {height: 33, position: 'absolute', left: 7, right: 7, bottom: 10, borderRadius: 13, backgroundColor: '#8F39F2', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4},
+  miloChatButtonText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 11},
+  miloChatEmpty: {color: '#A9A1B9', fontSize: 11, textAlign: 'center', paddingVertical: 24},
   cardRow: {flexDirection: 'row', gap: 7},
   featuredCard: {minHeight: 151, borderRadius: 19, overflow: 'hidden', borderWidth: 1, borderColor: '#4D426C', padding: 8},
   featuredTopRow: {height: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
@@ -703,8 +711,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
   },
-  navItem: { flex: 1, alignItems: 'center', gap: 6 },
-  navLabel: { color: '#C5BED3', fontSize: 10 },
+  navItem: {flex: 1, minWidth: 0, alignItems: 'center', gap: 6},
+  navLabel: {color: '#C5BED3', fontSize: 9, textAlign: 'center'},
   activeNav: { color: '#CE88FF', fontWeight: '700' },
   homeGlow: {
     shadowColor: '#B04DFF',
