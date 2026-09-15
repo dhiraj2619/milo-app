@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
+  FlatList,
+  Modal,
+  useWindowDimensions,
   Animated,
   Pressable,
   ScrollView,
@@ -12,9 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Bell,
-  Check,
   ChevronRight,
   Clock3,
+  MoreHorizontal,
   House,
   MapPin,
   MessageCircle,
@@ -23,7 +25,6 @@ import {
   Sparkles,
   Star,
   UserRound,
-  Video,
   X,
 } from 'lucide-react-native';
 import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
@@ -31,6 +32,7 @@ import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 import {claimDailyCoins} from '../../services/coinService';
+import {consumeWelcomeReward} from '../../services/sessionService';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { io } from 'socket.io-client';
 import { SERVER_URL } from '../../config/config';
@@ -95,11 +97,40 @@ const CHATS = [
   {name: 'Kabir', language: 'Hindi', gender: 'male', background: '#A6D4FF', hair: '#352720', shirt: '#4385B7', glasses: true},
   {name: 'Pooja', language: 'Tamil', background: '#E28CDE', hair: '#302020', shirt: '#B845B0'},
 ]; */
+const FAKE_NAMES = ['Aanya', 'Riya', 'Kiara', 'Meera', 'Sneha', 'Pooja', 'Ananya', 'Kavya', 'Isha', 'Nisha', 'Diya', 'Tanya', 'Aarav', 'Kabir', 'Rohan', 'Aryan', 'Vivaan', 'Arjun', 'Rahul', 'Aditya', 'Sana', 'Maya', 'Neha', 'Ira', 'Anika', 'Sia', 'Reyansh', 'Dev', 'Yash', 'Vihaan', 'Riyaan', 'Aditi', 'Bhavya', 'Rhea', 'Ishaan', 'Manav', 'Naina', 'Tara', 'Samar', 'Zoya'];
+const FAKE_LANGUAGES = ['Hindi', 'Marathi', 'English', 'Tamil', 'Telugu', 'Bengali', 'Gujarati', 'Kannada'];
+const FAKE_BACKGROUNDS = ['#A8D0F5', '#B8DDF4', '#9FC7E9', '#C7E2F5', '#AED4EC', '#D2E7F5', '#9EC9EC', '#BCDDF0'];
+const FAKE_PROFILES = FAKE_NAMES.map((nickname, index) => ({
+  _id: `demo-${index + 1}`,
+  nickname,
+  age: 20 + (index % 8),
+  gender: index % 3 === 0 ? 'male' : 'female',
+  languages: [FAKE_LANGUAGES[index % FAKE_LANGUAGES.length], FAKE_LANGUAGES[(index + 2) % FAKE_LANGUAGES.length]],
+  isOnline: index % 6 !== 0,
+  verified: index % 4 === 0,
+  bio: ['Ready to connect ✨', 'Let’s talk! 💜', 'Good vibes only ✨', 'Always up for fun 😄'][index % 4],
+  avatarStyle: {avatarSeed: `milo-demo-${index + 1}`, background: FAKE_BACKGROUNDS[index % FAKE_BACKGROUNDS.length], gender: index % 3 === 0 ? 'male' : 'female', hair: index % 3 === 0 ? '#33221E' : '#392323', shirt: index % 3 === 0 ? '#5275BE' : '#E56D9A', bun: index % 5 === 0, glasses: index % 7 === 0},
+}));
+
+function selectDemoProfiles(identity) {
+  let hash = 7;
+  for (let index = 0; index < identity.length; index += 1) hash = (hash * 31 + identity.charCodeAt(index)) % 2147483647;
+  const pool = [...FAKE_PROFILES];
+  for (let index = pool.length - 1; index > 0; index -= 1) {
+    hash = (hash * 48271) % 2147483647;
+    const target = hash % (index + 1);
+    [pool[index], pool[target]] = [pool[target], pool[index]];
+  }
+  return pool.slice(0, 5);
+}
 const FILTERS = [
   { label: 'For You', icon: Star },
   { label: 'Online' },
   { label: 'Nearby', icon: MapPin },
 ];
+function GiftMini() {
+  return <Text style={styles.giftMini}>🎁</Text>;
+}
 const TABS = [
   { label: 'Home', icon: House },
   { label: 'Chats', icon: MessageCircle },
@@ -107,38 +138,18 @@ const TABS = [
   { label: 'Profile', icon: UserRound },
 ];
 
-function CallCard({ person, onPress }) {
-  const avatar = person.avatarStyle || person;
+const LANGUAGE_LABELS = {Hindi: 'हिंदी', Marathi: 'मराठी', Bengali: 'বাংলা', Tamil: 'தமிழ்', Telugu: 'తెలుగు', Gujarati: 'ગુજરાતી', Kannada: 'ಕನ್ನಡ', English: 'English'};
+const languageLabel = language => LANGUAGE_LABELS[language] || language;
+function ConnectProfileCard({person, cardWidth, onPress}) {
   const isOffline = person.isOnline !== true;
-  return (
-    <View style={styles.callCard}>
-      <Gradient from="#25273C" to="#151321" radius={17} />
-      <View style={styles.portrait}>
-        <ProfileAvatar {...avatar} name={person.nickname || person.name} photoUrl={person.photoUrl} />
-        <View style={styles.presenceBadge}><View style={[styles.presenceDot, !person.isOnline && styles.offlineDot]} /><Text style={styles.presenceText}>{person.isOnline === false ? 'Offline' : 'Online'}</Text></View>
-      </View>
-      <View style={styles.personNameRow}>
-        <Text numberOfLines={1} style={styles.personName}>
-          {person.nickname || person.name}
-        </Text>
-        <Text style={styles.age}>{person.age || ''}</Text>
-        {person.verified && (
-          <View style={styles.verified}>
-            <Check size={9} strokeWidth={3} color="#FFFFFF" />
-          </View>
-        )}
-      </View>
-      <View style={styles.languageTags}>
-        {(person.languages || []).slice(0, 2).map(language => (
-          <View key={language} style={styles.languageTag}>
-            <Text style={styles.languageText}>{language}</Text>
-          </View>
-        ))}
-      </View>
-      <Text numberOfLines={1} style={styles.bio}>{person.bio || 'Ready to connect ✨'}</Text>
-      <View style={styles.callActions}><Pressable disabled={isOffline} accessibilityState={{disabled: isOffline}} accessibilityLabel={`Video call ${person.nickname || person.name}`} onPress={() => onPress('Video')} style={[styles.videoButton, isOffline && styles.disabledAction]}><Video size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Video</Text></Pressable><Pressable disabled={isOffline} accessibilityState={{disabled: isOffline}} accessibilityLabel={`Voice call ${person.nickname || person.name}`} onPress={() => onPress('Voice')} style={[styles.voiceButton, isOffline && styles.disabledAction]}><Phone size={17} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.actionText}>Voice</Text></Pressable></View>
-    </View>
-  );
+  return <View style={[styles.connectCard, {width: cardWidth}]}>
+    <Gradient from="#34455F" to="#080D17" radius={16} />
+    <View style={styles.connectTop}><View style={styles.presenceBadge}><View style={[styles.presenceDot, isOffline && styles.offlineDot]} /><Text style={styles.presenceText}>{isOffline ? 'Offline' : 'Online'}</Text></View><View style={styles.connectMore}><MoreHorizontal size={15} color="#F3EDFF" /></View></View>
+    <View style={styles.connectAvatar}><ProfileAvatar {...person.avatarStyle} name={person.nickname} /></View>
+    <Text numberOfLines={1} style={styles.connectName}>{person.nickname} {person.age || 22}</Text>
+    <View style={styles.connectTags}><View style={styles.connectTag}><Text style={styles.connectTagText}>{languageLabel(person.languages[0])}</Text></View></View>
+    <Pressable disabled={isOffline} onPress={() => onPress(person)} style={[styles.connectCallButton, isOffline && styles.disabledAction]}><Phone size={16} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.connectCallText}>Join Call</Text></Pressable>
+  </View>;
 }
 function ChatCard({ person, onPress }) {
   const isOffline = person.isOnline !== true;
@@ -148,6 +159,25 @@ function ChatCard({ person, onPress }) {
       <Text numberOfLines={1} style={styles.chatName}>{person.nickname}</Text><Text numberOfLines={1} style={styles.chatLanguage}>{person.languages?.[0] || 'MILO member'}</Text>
     </Pressable>
   );
+}
+function WelcomeRewardModal({reward, onClose}) {
+  if (!reward) return null;
+  return <Modal transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+    <View style={styles.welcomeOverlay}>
+      <View style={styles.welcomeCard}>
+        <Gradient from="#32106D" to="#100622" radius={24} glow />
+        <Pressable accessibilityRole="button" accessibilityLabel="Close welcome reward" onPress={onClose} style={styles.welcomeClose}><Text style={styles.welcomeCloseText}>×</Text></Pressable>
+        <Text style={[styles.welcomeConfetti, styles.confettiOne]}>✦</Text><Text style={[styles.welcomeConfetti, styles.confettiTwo]}>✧</Text><Text style={[styles.welcomeConfetti, styles.confettiThree]}>✦</Text>
+        <View style={styles.welcomeGift}><Gift /></View>
+        <Text style={styles.welcomeTitle}>Congratulations!</Text>
+        <Text style={styles.welcomeName}>{reward.nickname} 🎉</Text>
+        <Text style={styles.welcomeReceived}>You’ve received</Text>
+        <View style={styles.welcomeCoins}><Coin size={31} /><Text style={styles.welcomeCoinText}>{reward.amount} coins</Text></View>
+        <Text style={styles.welcomeBody}>Welcome to MILO!{`\n`}Use your coins to start conversations{`\n`}and make new friends.</Text>
+        <Pressable accessibilityRole="button" onPress={onClose} style={styles.welcomeButton}><Gradient from="#BD58FF" to="#6D24EF" radius={18} /><Text style={styles.welcomeButtonText}>Let’s Go</Text><ChevronRight size={20} color="#FFFFFF" strokeWidth={3} /></Pressable>
+      </View>
+    </View>
+  </Modal>;
 }
 function SectionTitle({ title, subtitle, isNew, onPress }) {
   return (
@@ -160,24 +190,19 @@ function SectionTitle({ title, subtitle, isNew, onPress }) {
           </View>
         )}
         <View style={styles.flex} />
-        <Pressable
-          accessibilityRole="button"
-          onPress={onPress}
-          hitSlop={8}
-          style={styles.seeAll}
-        >
-          <Text style={styles.seeAllText}>See all</Text>
-          <ChevronRight size={12} color="#B37AFF" />
-        </Pressable>
+{onPress && <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8} style={styles.seeAll}><Text style={styles.seeAllText}>See all</Text><ChevronRight size={12} color="#B37AFF" /></Pressable>}
       </View>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>
   );
 }
 export default function HomeScreen({navigation}) {
+  const {width: screenWidth} = useWindowDimensions();
   const toast = useToast();
   const [filter, setFilter] = useState('For You');
   const [claimingCoins, setClaimingCoins] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [welcomeReward, setWelcomeReward] = useState(null);
   const [profile, setProfile] = useState(null);
   const [people, setPeople] = useState([]);
   const [page, setPage] = useState(1);
@@ -203,6 +228,23 @@ export default function HomeScreen({navigation}) {
   React.useEffect(() => {
     getMyProfile().then(setProfile).catch(() => {});
   }, []);
+  React.useEffect(() => {
+    const updateCountdown = () => {
+      const lastClaim = profile?.lastDailyCoinClaimAt ? new Date(profile.lastDailyCoinClaimAt).getTime() : 0;
+      setSecondsLeft(Math.max(0, Math.ceil((lastClaim + 24 * 60 * 60 * 1000 - Date.now()) / 1000)));
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [profile?.lastDailyCoinClaimAt]);
+  React.useEffect(() => {
+    if (!profile) return undefined;
+    let mounted = true;
+    consumeWelcomeReward().then(reward => {
+      if (mounted && reward) setWelcomeReward({...reward, nickname: profile.nickname || reward.nickname});
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [profile]);
   React.useEffect(() => {
     let mounted = true;
     setLoadingPeople(true);
@@ -236,6 +278,8 @@ export default function HomeScreen({navigation}) {
     return () => { mounted = false; socket?.disconnect(); };
   }, []);
   const visiblePeople = filter === 'Online' ? people.filter(person => person.isOnline === true) : people;
+  const connectProfiles = React.useMemo(() => selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo'), [profile?.firebaseUid, profile?.phone, profile?.avatarSeed]);
+  const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);
   const loadMoreProfiles = async () => {
     if (loadingMore || loadingPeople || !hasNextPage) return;
     setLoadingMore(true);
@@ -263,6 +307,9 @@ export default function HomeScreen({navigation}) {
     Animated.timing(drawerX, {toValue: 420, duration: 220, useNativeDriver: true}).start(() => setDrawerOpen(false));
   };
   const userAvatar = profile?.avatarStyle || {avatarSeed: profile?.avatarSeed || 'milo-user', gender: profile?.gender || 'female'};
+  const rewardHours = String(Math.floor(secondsLeft / 3600)).padStart(2, '0');
+  const rewardMinutes = String(Math.floor((secondsLeft % 3600) / 60)).padStart(2, '0');
+  const rewardSeconds = String(secondsLeft % 60).padStart(2, '0');
   return (
     <SafeAreaView
       style={styles.screen}
@@ -311,46 +358,29 @@ export default function HomeScreen({navigation}) {
         </View>
 
         <View style={styles.reward}>
-          <Gradient from="#8139CF" to="#2B1555" radius={17} glow />
-          <View style={styles.rewardTop}>
-            <Gift />
-            <View style={styles.rewardCopy}>
-              <Text style={styles.rewardTitle}>DAILY FREE COINS</Text>
-              <Text style={styles.rewardDescription}>
-                Claim your free coins everyday{'\n'}and keep the conversations
-                going!
-              </Text>
-            </View>
+          <Gradient from="#40137C" to="#140B32" radius={21} glow />
+          <View style={styles.rewardSparkleOne}><Sparkles size={18} fill="#FFDC63" color="#FFDC63" /></View>
+          <View style={styles.rewardSparkleTwo}><Sparkles size={11} fill="#E58CFF" color="#E58CFF" /></View>
+          <View style={styles.rewardGift}><Gift /></View>
+          <View style={styles.rewardCopy}>
+            <View style={styles.rewardEyebrow}><Sparkles size={15} fill="#FFE664" color="#FFE664" /><Text style={styles.rewardTitle}>DAILY FREE COINS</Text></View>
+            <Text style={styles.rewardDescription}>Claim your free coins everyday{`\n`}and keep the conversations going!</Text>
           </View>
-          <View style={styles.freeBadge}>
-            <Sparkles size={10} color="#FFCC6B" />
-            <Text style={styles.freeText}>Free</Text>
-          </View>
-          <View style={styles.claimRow}>
-            <Coin size={27} />
-            <Text style={styles.coinAmount}>70 coins</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: claimingCoins }}
-              disabled={claimingCoins}
-              onPress={claimDailyReward}
-              style={styles.claimButton}
-            >
-              <Gradient from="#D25BFF" to="#6B25EE" radius={18} />
-              <Text style={styles.claimText}>
-                {claimingCoins ? 'Claiming…' : 'Claim Now'}
-              </Text>
-              <ChevronRight size={16} color="#FFFFFF" />
+          <View style={styles.freeBadge}><GiftMini /><Text style={styles.freeText}>Free</Text></View>
+          <View style={styles.rewardClaimArea}>
+            <View style={styles.coinPill}><Coin size={29} /><Text style={styles.coinAmount}>70 coins</Text></View>
+            <Pressable accessibilityRole="button" accessibilityState={{disabled: claimingCoins || secondsLeft > 0}} disabled={claimingCoins || secondsLeft > 0} onPress={claimDailyReward} style={[styles.claimButton, (claimingCoins || secondsLeft > 0) && styles.claimDisabled]}>
+              <Gradient from="#C554FF" to="#6524F5" radius={23} />
+              <Text style={styles.claimText}>{claimingCoins ? 'Claiming…' : secondsLeft > 0 ? 'Claimed' : 'Claim Now'}</Text><ChevronRight size={22} color="#FFFFFF" strokeWidth={3} />
             </Pressable>
           </View>
-          <View style={styles.timer}>
-            <Clock3 size={12} color="#C4B8D8" />
-            <Text style={styles.timerText}>
-              Claim again after <Text style={styles.timerBold}>24 hours</Text>
-            </Text>
+          <View style={styles.rewardCountdown}>
+            <View style={styles.nextRewardLabel}><Clock3 size={23} color="#FFFFFF" /><Text style={styles.nextRewardText}>{secondsLeft > 0 ? 'Next reward in' : 'Daily reward ready'}</Text></View>
+            {secondsLeft > 0 && <View style={styles.countdownGroups}>
+              {[{value:rewardHours,label:'Hours'}, {value:rewardMinutes,label:'Minutes'}, {value:rewardSeconds,label:'Seconds'}].map(item => <View key={item.label} style={styles.timeBox}><Text style={styles.timeValue}>{item.value}</Text><Text style={styles.timeLabel}>{item.label}</Text></View>)}
+            </View>}
           </View>
         </View>
-
         <View style={styles.filters}>
           {FILTERS.map(({ label, icon: Icon }) => (
             <Pressable
@@ -379,24 +409,18 @@ export default function HomeScreen({navigation}) {
           ))}
         </View>
 
-        <SectionTitle
-          title="MILO Connect"
-          subtitle="Real people. Real conversations."
-          onPress={() => preview('More profiles')}
+        <SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
+        <FlatList
+          horizontal
+          data={connectProfiles}
+          keyExtractor={item => item._id}
+          renderItem={({item}) => <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={() => preview('Calling')} />}
+          showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          snapToInterval={connectCardWidth + 10}
+          snapToAlignment="start"
+          contentContainerStyle={styles.connectList}
         />
-        <View style={styles.cardRow}>
-          {visiblePeople.slice(0, 3).map(person => (
-            <CallCard
-              key={person._id || person.firebaseUid || person.name}
-              person={person}
-              onPress={type => preview(`${type} calling`)}
-            />
-          ))}
-        </View>
-        {loadingPeople && <View style={styles.profilesStatus}><ActivityIndicator color="#B663FF" size="small" /><Text style={styles.statusText}>Finding people for you…</Text></View>}
-        {!loadingPeople && !visiblePeople.length && <View style={styles.emptyState}><Text style={styles.emptyTitle}>{filter === 'Online' ? 'No one is online yet' : 'No profiles available yet'}</Text><Text style={styles.emptyText}>Check back during active hours to meet new people.</Text></View>}
-        {loadingMore && <View style={styles.profilesStatus}><ActivityIndicator color="#B663FF" size="small" /><Text style={styles.statusText}>Loading more profiles…</Text></View>}
-        {!loadingPeople && !loadingMore && people.length > 0 && !hasNextPage && <Text style={styles.endText}>You’ve seen everyone for now.</Text>}
         <SectionTitle
           title="MILO Chat"
           subtitle="Start a chat before you call."
@@ -419,6 +443,7 @@ export default function HomeScreen({navigation}) {
           <View style={styles.upgrade}><Text style={styles.upgradeText}>Upgrade</Text><ChevronRight size={15} color="#FFFFFF" /></View>
         </Pressable>
       </ScrollView>
+      <WelcomeRewardModal reward={welcomeReward} onClose={() => setWelcomeReward(null)} />
       <View style={styles.bottomBar}>
         <Gradient from="#17142F" to="#090B15" radius={22} />
         {TABS.map(({ label, icon: Icon }) => (
@@ -466,7 +491,21 @@ export default function HomeScreen({navigation}) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#080910' },
+  welcomeOverlay: {flex: 1, backgroundColor: 'rgba(3,2,10,0.78)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 22},
+  welcomeCard: {width: '100%', alignSelf: 'stretch', minHeight: 446, borderRadius: 24, overflow: 'hidden', borderWidth: 1.5, borderColor: '#B466FF', alignItems: 'center', paddingHorizontal: 22, paddingTop: 20},
+  welcomeClose: {position: 'absolute', top: 10, right: 10, zIndex: 2, width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#7C60A9', backgroundColor: 'rgba(25,12,52,0.72)', alignItems: 'center', justifyContent: 'center'},
+  welcomeCloseText: {color: '#FFFFFF', fontSize: 22, lineHeight: 23},
+  welcomeConfetti: {position: 'absolute', color: '#FF70D6', fontSize: 22},
+  confettiOne: {left: 20, top: 34}, confettiTwo: {right: 36, top: 72, color: '#FFD05A'}, confettiThree: {left: 28, top: 230, color: '#A962FF'},
+  welcomeGift: {width: 132, height: 120, marginTop: 8, alignItems: 'center', justifyContent: 'center', transform: [{scale: 1.35}]},
+  welcomeTitle: {fontFamily: 'Poppins-Bold', color: '#FFFFFF', fontSize: 25, marginTop: 18},
+  welcomeName: {fontFamily: 'Poppins-SemiBold', color: '#F65CD8', fontSize: 17, marginTop: -2},
+  welcomeReceived: {fontFamily: 'Poppins-Regular', color: '#E9DFF4', fontSize: 12, marginTop: -1},
+  welcomeCoins: {height: 54, minWidth: 190, marginTop: 9, borderRadius: 16, borderWidth: 1, borderColor: '#493364', backgroundColor: 'rgba(9,5,23,0.66)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9},
+  welcomeCoinText: {fontFamily: 'Poppins-Bold', color: '#FFE45C', fontSize: 23},
+  welcomeBody: {fontFamily: 'Poppins-Regular', color: '#E5DBEF', textAlign: 'center', fontSize: 11, lineHeight: 15, marginTop: 12},
+  welcomeButton: {height: 48, width: '100%', marginTop: 15, marginBottom: 16, borderRadius: 19, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6},
+  welcomeButtonText: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14},  screen: { flex: 1, backgroundColor: '#080910' },
   flex: { flex: 1 },
   ambient: { position: 'absolute', top: 0, left: 0, right: 0, height: 180 },
   content: {
@@ -519,77 +558,30 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#FF426C',
   },
-  reward: {
-    borderWidth: 1,
-    borderColor: '#A265DE',
-    borderRadius: 17,
-    padding: 10,
-    overflow: 'hidden',
-    shadowColor: '#A447FA',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  rewardTop: { flexDirection: 'row', alignItems: 'center', paddingTop: 2 },
-  rewardCopy: { flex: 1, paddingTop: 5 },
-  rewardTitle: { fontFamily: 'Poppins-Bold', fontSize: 14, color: '#FFFFFF' },
-  rewardDescription: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 9,
-    lineHeight: 13,
-    color: '#F3E8FF',
-  },
-  freeBadge: {
-    position: 'absolute',
-    right: 9,
-    top: 6,
-    flexDirection: 'row',
-    gap: 3,
-    alignItems: 'center',
-    backgroundColor: '#542278',
-    borderColor: '#D984F3',
-    borderWidth: 0.7,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  freeText: { fontSize: 9, color: '#FFEAF6' },
-  claimRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 11,
-    gap: 9,
-    backgroundColor: '#1C0E3C',
-    borderRadius: 15,
-  },
-  coinAmount: {
-    flex: 1,
-    fontFamily: 'Poppins-Bold',
-    fontSize: 21,
-    color: '#FFDC51',
-  },
-  claimButton: {
-    height: 35,
-    minWidth: 101,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  claimText: { fontFamily: 'Poppins-Medium', fontSize: 11, color: '#FFFFFF' },
-  timer: {
-    marginTop: 5,
-    borderRadius: 12,
-    backgroundColor: '#1B0C36',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 6,
-  },
-  timerText: { fontSize: 9, color: '#C9BBD9' },
-  timerBold: { color: '#F1EAF8', fontWeight: '700' },
+  reward: {height: 190, borderWidth: 1, borderColor: '#B363F2', borderRadius: 21, overflow: 'hidden', shadowColor: '#B14CFF', shadowOpacity: 0.38, shadowRadius: 15, shadowOffset: {width: 0, height: 6}},
+  rewardGift: {position: 'absolute', left: 8, top: 47, width: 83, height: 75, alignItems: 'center', justifyContent: 'center', transform: [{scale: 0.9}]},
+  rewardCopy: {position: 'absolute', top: 16, left: 104, right: 14},
+  rewardEyebrow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  rewardTitle: {fontFamily: 'Poppins-Bold', fontSize: 10, letterSpacing: 0.2, color: '#FF9EFB'},
+  rewardDescription: {fontFamily: 'Poppins-Medium', fontSize: 12, lineHeight: 16, color: '#FFFFFF', marginTop: 7},
+  rewardSparkleOne: {position: 'absolute', left: 15, top: 27},
+  rewardSparkleTwo: {position: 'absolute', right: 25, top: 54},
+  freeBadge: {position: 'absolute', right: 10, top: 8, height: 28, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 18, paddingHorizontal: 8, backgroundColor: '#220B38', borderWidth: 1, borderColor: '#CA6CFF'},
+  giftMini: {fontSize: 13},
+  freeText: {fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#FFFFFF'},
+  rewardClaimArea: {position: 'absolute', left: 12, right: 12, top: 88, height: 48, flexDirection: 'row', alignItems: 'center', gap: 7, padding: 5, borderRadius: 17, borderWidth: 1, borderColor: '#3E3856', backgroundColor: '#140D2B'},
+  coinPill: {flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 4},
+  coinAmount: {fontFamily: 'Poppins-Bold', fontSize: 20, color: '#FFE459'},
+  claimButton: {width: 112, height: 38, borderRadius: 20, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4},
+  claimDisabled: {opacity: 0.62},
+  claimText: {fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#FFFFFF'},
+  rewardCountdown: {position: 'absolute', left: 13, right: 13, bottom: 8, minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  nextRewardLabel: {flexDirection: 'row', alignItems: 'center', gap: 9, flexShrink: 1},
+  nextRewardText: {fontFamily: 'Poppins-Medium', color: '#F6F0FC', fontSize: 10},
+  countdownGroups: {flexDirection: 'row', gap: 5},
+  timeBox: {width: 42, height: 42, borderRadius: 11, borderWidth: 1, borderColor: '#4F4765', backgroundColor: '#111120', alignItems: 'center', justifyContent: 'center'},
+  timeValue: {fontFamily: 'Poppins-Bold', color: '#FFFFFF', fontSize: 15, lineHeight: 18},
+  timeLabel: {fontFamily: 'Poppins-Regular', color: '#DAD4E5', fontSize: 7},
   filters: { flexDirection: 'row', gap: 8, marginTop: 16 },
   filter: {
     flex: 1,
@@ -627,75 +619,44 @@ const styles = StyleSheet.create({
   },
   seeAll: { flexDirection: 'row', alignItems: 'center' },
   seeAllText: { fontSize: 10, color: '#B37AFF' },
-  cardRow: { flexDirection: 'row', gap: 7 },
-  callCard: {
-    flex: 1,
-    minWidth: 0,
-    borderWidth: 1,
-    borderColor: '#36334C',
-    borderRadius: 15,
-    padding: 0,
-    overflow: 'hidden',
-  },
-  portrait: { width: '100%', aspectRatio: 0.91, maxHeight: 160, overflow: 'hidden' },
-  online: {
-    position: 'absolute',
-    right: 3,
-    top: 3,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#20EE90',
-    borderWidth: 1,
-    borderColor: '#398C77',
-  },
-  presenceBadge: {position: 'absolute', top: 7, left: 7, backgroundColor: 'rgba(17,18,29,0.72)', borderRadius: 9, paddingHorizontal: 6, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 3},
+  connectList: {paddingRight: 14, gap: 10},
+  connectCard: {height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#616F94', backgroundColor: '#1C2133', padding: 8},
+  connectTop: {height: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2},
+  connectMore: {width: 21, height: 21, borderRadius: 11, backgroundColor: 'rgba(10,9,22,0.46)', alignItems: 'center', justifyContent: 'center'},
+  connectAvatar: {position: 'absolute', left: 20, right: 20, top: 27, height: 106, overflow: 'hidden', borderRadius: 56, backgroundColor: '#CF91DF'},
+  connectName: {position: 'absolute', left: 10, right: 10, top: 136, fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14},
+  connectTags: {position: 'absolute', left: 10, top: 159, flexDirection: 'row', gap: 3},
+  connectTag: {borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, backgroundColor: 'rgba(24,10,48,0.5)'},
+  connectTagText: {color: '#F2ECF9', fontFamily: 'Poppins-Medium', fontSize: 9},
+  connectCallButton: {position: 'absolute', left: 8, right: 8, bottom: 9, height: 38, borderRadius: 20, backgroundColor: '#873BF1', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5},
+  connectCallText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 11},
+  cardRow: {flexDirection: 'row', gap: 7},
+  featuredCard: {minHeight: 151, borderRadius: 19, overflow: 'hidden', borderWidth: 1, borderColor: '#4D426C', padding: 8},
+  featuredTopRow: {height: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  featuredMore: {width: 22, height: 22, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(17,15,34,0.55)'},
+  featuredBody: {flexDirection: 'row', marginTop: 2, alignItems: 'center'},
+  featuredAvatar: {width: 88, height: 88, borderRadius: 44, overflow: 'hidden', backgroundColor: '#B7AFFF'},
+  featuredInfo: {flex: 1, marginLeft: 10, minWidth: 0},
+  featuredNameRow: {flexDirection: 'row', alignItems: 'center', gap: 6},
+  featuredName: {fontFamily: 'Poppins-Bold', fontSize: 15, color: '#FFFFFF', flexShrink: 1},
+  featuredVerified: {width: 14, height: 14, borderRadius: 9, backgroundColor: '#9B53FF', alignItems: 'center', justifyContent: 'center'},
+  featuredTags: {flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4},
+  featuredTag: {paddingHorizontal: 5, paddingVertical: 1, borderRadius: 9, backgroundColor: 'rgba(15,13,31,0.55)'},
+  featuredTagText: {fontFamily: 'Poppins-Medium', color: '#EEE9F6', fontSize: 7},
+  featuredLocation: {flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5},
+  featuredLocationText: {color: '#E5DEEF', fontSize: 8},
+  featuredDetails: {color: '#E5DEEF', fontSize: 8, marginTop: 2},
+  featuredBio: {color: '#FFFFFF', fontFamily: 'Poppins-Medium', fontSize: 8, marginTop: 2},
+  featuredPrompt: {color: '#DDD4E9', fontSize: 7, marginTop: 2},
+  featuredActions: {flexDirection: 'row', gap: 7, marginTop: 7},
+  featuredVideo: {flex: 1, minHeight: 31, borderRadius: 24, backgroundColor: '#8B41F2', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8},
+  featuredVoice: {flex: 1, minHeight: 31, borderRadius: 24, backgroundColor: '#F43882', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8},
+  featuredActionText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 9},
+  presenceBadge: {backgroundColor: 'rgba(17,18,29,0.72)', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4},
   presenceDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#19E58A'},
   offlineDot: {backgroundColor: '#8A8493'},
-  presenceText: {fontSize: 8, color: '#FFFFFF'},
-  personNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-    paddingHorizontal: 8,
-  },
-  personName: {
-    color: '#FFFFFF',
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-    flexShrink: 1,
-  },
-  age: { color: '#DDD8EA', fontSize: 10 },
-  verified: {
-    width: 12,
-    height: 12,
-    borderRadius: 4,
-    backgroundColor: '#5E526F',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  languageTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 3,
-    marginTop: 4,
-    paddingHorizontal: 8,
-  },
-  languageTag: {
-    borderRadius: 8,
-    backgroundColor: '#2C2B40',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  languageText: { fontSize: 8, color: '#D1CDDF' },
-  bio: { fontSize: 8, color: '#DDD7E8', marginTop: 6, marginBottom: 7, paddingHorizontal: 8 },
-  callActions: {flexDirection: 'row', gap: 7, paddingHorizontal: 8, paddingBottom: 10},
-  videoButton: {flex: 1, minHeight: 45, borderRadius: 20, backgroundColor: '#9144F4', alignItems: 'center', justifyContent: 'center', gap: 2},
-  voiceButton: {flex: 1, minHeight: 45, borderRadius: 20, backgroundColor: '#F13D8B', alignItems: 'center', justifyContent: 'center', gap: 2},
-  disabledAction: {opacity: 0.35},
-  actionText: {color: '#FFFFFF', fontSize: 9, fontFamily: 'Poppins-Medium'},
-  pressed: { opacity: 0.7 },
+  presenceText: {fontSize: 8, color: '#FFFFFF', fontFamily: 'Poppins-Medium'},
+  disabledAction: {opacity: 0.68},
   newBadge: {
     borderWidth: 1,
     borderColor: '#027F65',

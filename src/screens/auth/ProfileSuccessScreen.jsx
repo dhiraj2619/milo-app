@@ -3,12 +3,11 @@ import {AccessibilityInfo, Animated, BackHandler, Easing, StatusBar, StyleSheet,
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg, {Circle, Defs, LinearGradient, Path, RadialGradient, Stop} from 'react-native-svg';
 import AppButton from '../../components/ui/AppButton';
-import {useToast} from '../../components/ui/ToastProvider';
+import {queueWelcomeReward} from '../../services/sessionService';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function ProfileSuccessScreen({navigation, onProfileCompleted, route}) {
-  const toast = useToast();
   const scale = useRef(new Animated.Value(0.7)).current;
   const stroke = useRef(new Animated.Value(100)).current;
 
@@ -33,18 +32,17 @@ export default function ProfileSuccessScreen({navigation, onProfileCompleted, ro
     AccessibilityInfo.isReduceMotionEnabled().then(animate).catch(() => animate(true));
     const motion = AccessibilityInfo.addEventListener('reduceMotionChanged', animate);
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
-      onProfileCompleted?.();
+      queueWelcomeReward(route.params?.nickname || 'there').finally(() => onProfileCompleted?.());
       return true;
     });
     return () => {disposed = true; animation?.stop(); motion.remove(); back.remove();};
-  }, [navigation, onProfileCompleted, scale, stroke]);
+  }, [navigation, onProfileCompleted, route.params?.nickname, scale, stroke]);
 
-  useEffect(() => {
-    const nickname = route.params?.nickname || 'there';
-    toast(`Hello ${nickname}! You received 100 welcome bonus coins.`);
-  }, [route.params?.nickname, toast]);
+  const continueToHome = async () => {
+    await queueWelcomeReward(route.params?.nickname || 'there');
+    onProfileCompleted?.();
+  };
 
-  const continueToHome = () => onProfileCompleted?.();
 
   return <SafeAreaView style={styles.screen}>
     <StatusBar barStyle="light-content" />
