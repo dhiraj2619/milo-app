@@ -1,4 +1,4 @@
-﻿import React, { useId } from 'react';
+import React, { useId } from 'react';
 import { StyleSheet } from 'react-native';
 import Svg, {
   Circle,
@@ -16,6 +16,7 @@ export function Gradient({
   to = '#6327F1',
   radius = 16,
   glow = false,
+  opacity = 1,
 }) {
   const id = useId();
   return (
@@ -24,6 +25,7 @@ export function Gradient({
       pointerEvents="none"
       width="100%"
       height="100%"
+      opacity={opacity}
     >
       <Defs>
         <LinearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
