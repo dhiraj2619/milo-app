@@ -1,30 +1,142 @@
-import React, {useEffect, useState} from 'react';
-import {ActivityIndicator, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
-import {ArrowLeft, MicOff, MoreVertical, PhoneOff, Radio, ShieldCheck, Sparkles, Volume2} from 'lucide-react-native';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {ActivityIndicator, Animated, Easing, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {ArrowLeft, Check, Mic, MoreHorizontal, Phone, ShieldCheck, Volume2} from 'lucide-react-native';
 import {Gradient} from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AudioRoomScreen({navigation, route}) {
-const person = route.params?.person || {};
+  const initialPerson = route.params?.person || {};
+  const [person, setPerson] = useState(initialPerson);
+  const availablePeople = useMemo(() => Array.isArray(route.params?.availablePeople) ? route.params.availablePeople : [], [route.params?.availablePeople]);
   const isDemo = route.params?.isDemo === true;
+  const name = person.nickname || 'MILO member';
   const [joined, setJoined] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const [findingOther, setFindingOther] = useState(false);
+  const [matchProgress, setMatchProgress] = useState(0);
+  const ambient = useRef(new Animated.Value(0)).current;
+  const activity = useRef(new Animated.Value(0)).current;
+  const connectionPulse = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (!isDemo) return undefined;
-    const timer = setTimeout(() => setBusy(true), 2000);
-    return () => clearTimeout(timer);
+    const busyTimer = setTimeout(() => setUnavailable(true), 2000);
+    const findingTimer = setTimeout(() => setFindingOther(true), 3200);
+    return () => { clearTimeout(busyTimer); clearTimeout(findingTimer); };
   }, [isDemo]);
-  const name = person.nickname || 'MILO member';
-  return <SafeAreaView style={styles.screen}>
-    <StatusBar barStyle="light-content" backgroundColor="#090A23" />
-    <View style={styles.topGlow} /><View style={styles.sideGlow} />
-    <View style={styles.header}><Pressable onPress={() => navigation.goBack()} style={styles.iconButton}><ArrowLeft size={22} color="#F4EFFF" /></Pressable><View><Text style={styles.headerTitle}>Audio Room</Text><Text style={styles.private}><ShieldCheck size={10} color="#3DEB9A" /> Private</Text></View><Pressable style={styles.iconButton}><MoreVertical size={21} color="#F4EFFF" /></Pressable></View>
-    <View style={styles.hero}><View style={styles.outerRing}><View style={styles.midRing}><View style={styles.avatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /><View style={styles.onlineDot} /></View></View></View><View style={styles.waveRow}><Radio size={34} color="#A850FF" /><Radio size={34} color="#A850FF" /></View><Text style={styles.name}>{name}</Text><Text style={styles.waiting}>{busy ? name + ' is busy now' : joined ? 'You are connected' : 'Waiting for you to join'}</Text></View>
-    <View style={styles.statusCard}><Gradient from="#2F1A69" to="#171033" radius={16} /><Sparkles size={19} color="#C361FF" fill="#C361FF" /><Text style={styles.statusText}>{joined ? 'Audio room is live' : 'Preparing your audio room'}</Text><View style={styles.dots}><View style={styles.dot}/><View style={styles.dot}/><View style={styles.dot}/></View></View>
-    <View style={styles.members}><View style={styles.member}><View style={styles.memberAvatar}><ProfileAvatar name="You" /></View><Text style={styles.memberLabel}>You</Text></View><Radio size={24} color="#BD5DFF" /><View style={styles.member}><View style={styles.memberAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /><View style={styles.memberOnline}/></View><Text numberOfLines={1} style={styles.memberLabel}>{name}</Text></View></View>
-    <View style={styles.matchingStatus}>{isDemo && !busy && <ActivityIndicator size="small" color="#C364FF" />}<Text style={styles.matchingText}>{busy ? 'Connecting you with another person…' : isDemo ? 'Checking room availability…' : 'Be kind. Keep it comfortable.'}</Text></View>
-    <View style={styles.controls}><Pressable style={styles.control}><MicOff size={21} color="#E7DFFD" /><Text style={styles.controlText}>Mic Off</Text></Pressable><Pressable style={styles.control}><Volume2 size={21} color="#E7DFFD" /><Text style={styles.controlText}>Speaker</Text></Pressable><Pressable disabled={busy} onPress={() => setJoined(value => !value)} style={[styles.join, busy && styles.joinBusy]}><Gradient from="#E85BFF" to="#7725F3" radius={28} /><PhoneOff size={23} color="#FFFFFF" /><Text style={styles.joinText}>{joined ? 'Leave' : 'Join Room'}</Text></Pressable><Pressable style={styles.control}><Sparkles size={21} color="#E7DFFD" /><Text style={styles.controlText}>Effects</Text></Pressable></View>
+
+  useEffect(() => {
+    if (!findingOther) return undefined;
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      const nextProgress = Math.min(100, ((Date.now() - startedAt) / 120000) * 100);
+      setMatchProgress(nextProgress);
+      if (nextProgress >= 100) {
+        clearInterval(interval);
+        const nextPerson = availablePeople.find(member => member._id !== initialPerson._id);
+        if (nextPerson) { setPerson(nextPerson); setUnavailable(false); setFindingOther(false); setMatchProgress(0); }
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [availablePeople, findingOther, initialPerson._id]);
+  useEffect(() => {
+    const lines = Animated.loop(Animated.sequence([
+      Animated.timing(connectionPulse, {toValue: 1, duration: 760, easing: Easing.out(Easing.quad), useNativeDriver: true}),
+      Animated.timing(connectionPulse, {toValue: 0, duration: 760, easing: Easing.in(Easing.quad), useNativeDriver: true}),
+    ]));
+    lines.start();
+    return () => { lines.stop(); connectionPulse.stopAnimation(); };
+  }, [connectionPulse]);
+  useEffect(() => {
+    const ambientLoop = Animated.loop(Animated.sequence([
+      Animated.timing(ambient, {toValue: 1, duration: 4200, easing: Easing.inOut(Easing.sin), useNativeDriver: true}),
+      Animated.timing(ambient, {toValue: 0, duration: 4200, easing: Easing.inOut(Easing.sin), useNativeDriver: true}),
+    ]));
+    const activityLoop = Animated.loop(Animated.timing(activity, {toValue: 1, duration: 1250, easing: Easing.linear, useNativeDriver: true}));
+    ambientLoop.start();
+    activityLoop.start();
+    return () => { ambientLoop.stop(); activityLoop.stop(); ambient.stopAnimation(); activity.stopAnimation(); };
+  }, [activity, ambient]);
+
+  const glowTranslate = ambient.interpolate({inputRange: [0, 1], outputRange: [0, 22]});
+  const glowOpacity = ambient.interpolate({inputRange: [0, 1], outputRange: [0.34, 0.64]});
+  const lineScale = connectionPulse.interpolate({inputRange: [0, 1], outputRange: [0.15, 1]});
+  const waveScale = activity.interpolate({inputRange: [0, 1], outputRange: [0.35, 1]});
+  const waveOpacity = activity.interpolate({inputRange: [0, 0.75, 1], outputRange: [0.1, 0.95, 0.1]});
+  const callStatus = joined ? 'Connected - private room' : 'Waiting for you to join';  const statusText = joined ? 'Your private audio room is live' : 'Preparing a private audio room';
+
+  return <SafeAreaView style={styles.screen} edges={['top', 'bottom', 'left', 'right']}>
+    <StatusBar barStyle="light-content" backgroundColor="#08091C" />
+    <Animated.View pointerEvents="none" style={[styles.topGlow, {opacity: glowOpacity, transform: [{translateY: glowTranslate}]}]} />
+    <Animated.View pointerEvents="none" style={[styles.sideGlow, {opacity: glowOpacity, transform: [{translateY: glowTranslate}]}]} />
+
+    <View style={styles.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.headerButton}><ArrowLeft size={21} color="#F6F0FF" /></Pressable>
+      <View style={styles.headerCopy}><Text style={styles.headerTitle}>Audio Room</Text><View style={styles.privateLine}><ShieldCheck size={11} color="#35DF9B" /><Text style={styles.privateText}>Private</Text></View></View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Room options" style={styles.headerButton}><MoreHorizontal size={22} color="#F6F0FF" /></Pressable>
+    </View>
+
+    <View style={styles.hero}>
+      <View style={styles.avatarStage}>
+        <View style={styles.avatarFrame}>
+          <Gradient from="#C56CFF" to="#5B23DF" radius={70} />
+          <View style={styles.avatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /></View>
+          {!unavailable && <View style={styles.onlineDot}><Check size={9} color="#062015" strokeWidth={3} /></View>}
+        </View>
+      </View>
+      <Text style={styles.name}>{name}</Text>
+      <Text style={[styles.callStatus, unavailable && styles.busyStatus]}>{callStatus}</Text>
+    </View>
+
+    <View style={styles.statusCard}>
+      <View style={styles.statusIcon}><Phone size={16} color="#D797FF" /></View>
+      <View style={styles.statusCopy}><Text style={styles.statusTitle}>{statusText}</Text><Text style={styles.statusSubtext}>{unavailable ? 'Please wait a moment.' : 'Only you and your match can hear this call.'}</Text></View>
+      {!unavailable && <View style={styles.statusDots}><Animated.View style={[styles.statusDot, {opacity: waveOpacity, transform: [{scale: waveScale}]}]} /><Animated.View style={[styles.statusDot, styles.statusDotDim, {opacity: waveOpacity, transform: [{scale: waveScale}]}]} /><Animated.View style={[styles.statusDot, styles.statusDotDim, {opacity: waveOpacity, transform: [{scale: waveScale}]}]} /></View>}
+    </View>
+
+    <View style={styles.participantSection}>
+      <Text style={styles.sectionLabel}>PARTICIPANTS</Text>
+      <View style={styles.participants}>
+        <View style={styles.participant}><View style={styles.participantAvatar}><ProfileAvatar name="You" /></View><Text style={styles.participantName}>You</Text></View>
+        <View style={styles.connection}><Animated.View style={[styles.connectionLine, {transform: [{scaleX: lineScale}]}]} /><Animated.View style={{opacity: waveOpacity, transform: [{scale: waveScale}]}}><Phone size={15} color="#B65BFF" /></Animated.View><Animated.View style={[styles.connectionLine, {transform: [{scaleX: lineScale}]}]} /></View>
+        <View style={styles.participant}><View style={styles.participantAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /></View><Text numberOfLines={1} style={styles.participantName}>{name}</Text></View>
+      </View>
+    </View>
+
+<View style={styles.safetyHint}><ShieldCheck size={14} color="#A978E6" /><Text style={styles.safetyText}>Private conversation - Be kind and stay respectful.</Text></View>
+    {unavailable && <View style={styles.unavailableBlock}><View style={styles.unavailableNotice}>{findingOther && <ActivityIndicator size="small" color="#D071FF" />}<Text style={styles.unavailableText}>{findingOther ? 'Connecting with other MILO... Please wait.' : name + ' is busy now'}</Text></View>{findingOther && <View style={styles.matchTrack}><View style={[styles.matchProgress, {width: `${matchProgress}%`}]} /></View>}</View>}
+
+    <View style={styles.controls}>
+      <Pressable accessibilityRole="button" style={styles.control}><Mic size={21} color="#F0E8FC" /><Text style={styles.controlText}>Mic</Text></Pressable>
+      <Pressable accessibilityRole="button" style={styles.control}><Volume2 size={21} color="#F0E8FC" /><Text style={styles.controlText}>Speaker</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={unavailable} onPress={() => setJoined(value => !value)} style={[styles.joinButton, unavailable && styles.joinDisabled]}><Gradient from="#D65CFF" to="#6822F1" radius={27} /><Phone size={21} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.joinText}>{joined ? 'Leave Room' : 'Join Room'}</Text></Pressable>
+      <Pressable accessibilityRole="button" style={styles.control}><MoreHorizontal size={22} color="#F0E8FC" /><Text style={styles.controlText}>More</Text></Pressable>
+    </View>
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({screen:{flex:1,backgroundColor:'#090A23',paddingHorizontal:16},topGlow:{position:'absolute',top:-90,left:-48,width:210,height:210,borderRadius:110,backgroundColor:'#4B238B',opacity:.62},sideGlow:{position:'absolute',top:88,right:-110,width:250,height:430,borderRadius:140,backgroundColor:'#26115C',opacity:.5},header:{height:70,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},iconButton:{width:34,height:34,borderRadius:18,backgroundColor:'rgba(44,35,90,.7)',borderWidth:1,borderColor:'#3D3471',alignItems:'center',justifyContent:'center'},headerTitle:{fontFamily:'Poppins-SemiBold',fontSize:14,color:'#FFF',textAlign:'center'},private:{fontSize:9,color:'#A79BC8',textAlign:'center'},hero:{alignItems:'center',marginTop:23},outerRing:{width:137,height:137,borderRadius:69,backgroundColor:'rgba(157,62,255,.2)',borderWidth:2,borderColor:'#6E33D1',alignItems:'center',justifyContent:'center'},midRing:{width:116,height:116,borderRadius:58,borderWidth:4,borderColor:'#A94EFF',padding:5},avatar:{flex:1,borderRadius:52,overflow:'hidden'},onlineDot:{position:'absolute',right:3,bottom:4,width:14,height:14,borderRadius:7,backgroundColor:'#2BEF9C',borderWidth:2,borderColor:'#29135F'},waveRow:{position:'absolute',top:58,width:230,flexDirection:'row',justifyContent:'space-between'},name:{fontFamily:'Poppins-SemiBold',fontSize:20,color:'#FFF',marginTop:14},waiting:{fontSize:11,color:'#A79BC8',marginTop:-3},statusCard:{height:64,marginTop:17,borderWidth:1,borderColor:'#6848B8',borderRadius:16,overflow:'hidden',flexDirection:'row',alignItems:'center',paddingHorizontal:18,gap:9},statusText:{fontFamily:'Poppins-Medium',fontSize:12,color:'#F2EDFF'},dots:{position:'absolute',bottom:10,left:0,right:0,flexDirection:'row',justifyContent:'center',gap:6},dot:{width:7,height:7,borderRadius:4,backgroundColor:'#B15EFF'},members:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:30,marginTop:28},member:{alignItems:'center',width:70},memberAvatar:{width:55,height:55,borderRadius:28,padding:3,borderWidth:2,borderColor:'#A851F6',overflow:'visible'},memberOnline:{position:'absolute',right:0,bottom:0,width:10,height:10,borderRadius:5,backgroundColor:'#32E997'},memberLabel:{fontSize:10,color:'#FFF',marginTop:5},matchingStatus:{height:28,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:19},matchingText:{fontSize:10,color:'#B4A8CF'},controls:{position:'absolute',left:16,right:16,bottom:25,height:74,borderRadius:18,borderWidth:1,borderColor:'#3D3568',backgroundColor:'rgba(29,23,62,.9)',flexDirection:'row',alignItems:'center',justifyContent:'space-around'},control:{alignItems:'center',gap:4,width:52},controlText:{fontSize:8,color:'#DDD4EE'},join:{height:55,minWidth:92,borderRadius:28,overflow:'hidden',alignItems:'center',justifyContent:'center',flexDirection:'row',gap:5},joinBusy:{opacity:.5},joinText:{fontFamily:'Poppins-Medium',fontSize:10,color:'#FFF'}});
+
+const styles = StyleSheet.create({
+  screen: {flex: 1, backgroundColor: '#08091C', paddingHorizontal: 18},
+  topGlow: {position: 'absolute', top: -105, left: -74, width: 250, height: 250, borderRadius: 140, backgroundColor: 'rgba(102, 43, 187, 0.34)'},
+  sideGlow: {position: 'absolute', top: 128, right: -132, width: 278, height: 370, borderRadius: 160, backgroundColor: 'rgba(62, 28, 131, 0.23)'},
+  header: {height: 68, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  headerButton: {width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(31, 27, 67, 0.78)', borderWidth: 1, borderColor: '#393263', alignItems: 'center', justifyContent: 'center'},
+  headerCopy: {alignItems: 'center'}, headerTitle: {fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#FFFFFF'},
+  privateLine: {flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -1}, privateText: {fontFamily: 'Poppins-Medium', fontSize: 9, color: '#AAA1C2'},
+  hero: {alignItems: 'center', marginTop: 26}, avatarStage: {width: 158, height: 158, alignItems: 'center', justifyContent: 'center'},
+  avatarFrame: {width: 112, height: 112, borderRadius: 56, padding: 4, overflow: 'visible'}, avatar: {flex: 1, borderRadius: 52, overflow: 'hidden'},
+  onlineDot: {position: 'absolute', right: 4, bottom: 5, width: 19, height: 19, borderRadius: 10, backgroundColor: '#31EB98', borderWidth: 2, borderColor: '#24105D', alignItems: 'center', justifyContent: 'center'},
+  name: {fontFamily: 'Poppins-SemiBold', fontSize: 22, color: '#FFFFFF', marginTop: 8}, callStatus: {fontFamily: 'Poppins-Regular', fontSize: 11, color: '#B4A8CD', marginTop: -2}, busyStatus: {color: '#FF92BF'},
+  statusCard: {minHeight: 64, marginTop: 25, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(132, 91, 205, 0.62)', backgroundColor: 'rgba(35, 22, 74, 0.72)', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center'},
+  statusIcon: {width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(134, 58, 222, 0.22)', alignItems: 'center', justifyContent: 'center'}, statusCopy: {flex: 1, marginLeft: 10}, statusTitle: {fontFamily: 'Poppins-Medium', fontSize: 12, color: '#F7F2FF'}, statusSubtext: {fontFamily: 'Poppins-Regular', fontSize: 9, color: '#AFA4C8', marginTop: 1},
+  statusDots: {flexDirection: 'row', gap: 4}, statusDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: '#CB71FF'}, statusDotDim: {opacity: 0.38},
+  participantSection: {marginTop: 30, alignItems: 'center'}, sectionLabel: {fontFamily: 'Poppins-SemiBold', fontSize: 9, letterSpacing: 1.2, color: '#8E83A9'}, participants: {marginTop: 11, flexDirection: 'row', alignItems: 'center', gap: 19},
+  participant: {width: 74, alignItems: 'center'}, participantAvatar: {width: 54, height: 54, borderRadius: 27, padding: 2, borderWidth: 1.5, borderColor: '#9250DD', overflow: 'hidden'}, participantName: {fontFamily: 'Poppins-Medium', fontSize: 10, color: '#F7F2FF', marginTop: 5, maxWidth: 74},
+  connection: {width: 58, flexDirection: 'row', alignItems: 'center', gap: 4}, connectionLine: {height: 1, flex: 1, backgroundColor: '#5F3E91'},
+  unavailableBlock: {marginTop: 10, alignItems: 'center'}, unavailableNotice: {height: 28, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8}, unavailableText: {fontFamily: 'Poppins-Medium', fontSize: 11, color: '#D9C7EF'}, matchTrack: {width: 156, height: 6, marginTop: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: 'rgba(184, 158, 225, 0.2)'}, matchProgress: {height: '100%', borderRadius: 2, backgroundColor: '#FFFFFF'},
+  safetyHint: {marginTop: 26, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 30, borderRadius: 15, backgroundColor: 'rgba(33, 27, 63, 0.62)'}, safetyText: {fontFamily: 'Poppins-Regular', fontSize: 9, color: '#B8AFCC'},
+  controls: {position: 'absolute', left: 18, right: 18, bottom: 18, minHeight: 78, borderRadius: 20, borderWidth: 1, borderColor: '#38305D', backgroundColor: 'rgba(21, 18, 45, 0.94)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 5},
+  control: {width: 52, alignItems: 'center', gap: 4}, controlText: {fontFamily: 'Poppins-Regular', fontSize: 8, color: '#D7CFE5'},
+  joinButton: {height: 55, minWidth: 108, borderRadius: 28, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6}, joinDisabled: {opacity: 0.48}, joinText: {fontFamily: 'Poppins-SemiBold', fontSize: 11, color: '#FFFFFF'},
+});

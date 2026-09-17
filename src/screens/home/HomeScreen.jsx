@@ -287,10 +287,20 @@ export default function HomeScreen({ navigation }) {
     connectPresence();
     return () => { mounted = false; socket?.disconnect(); };
   }, []);
-  const visiblePeople = filter === 'Online' ? people.filter(person => person.isOnline === true) : people;
-  const connectProfiles = React.useMemo(() => [...people.filter(person => person.isOnline === true), ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo')], [people, profile?.firebaseUid, profile?.phone, profile?.avatarSeed]);
-  const joinCall = person => {
-    navigation.navigate('AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-')});
+  const preferredGender = profile?.gender?.toLowerCase();
+  const matchesGenderPreference = person => {
+    const personGender = person.gender?.toLowerCase();
+    if (preferredGender === 'male') return personGender === 'female';
+    if (preferredGender === 'female') return personGender === 'male';
+    return true;
+  };
+  const matchingPeople = people.filter(matchesGenderPreference);
+  const visiblePeople = filter === 'Online' ? matchingPeople.filter(person => person.isOnline === true) : matchingPeople;
+  const connectProfiles = [
+    ...matchingPeople.filter(person => person.isOnline === true),
+    ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo').filter(matchesGenderPreference),
+  ];  const joinCall = person => {
+    navigation.navigate('AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
   };
   const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);
   const miloChatCardWidth = Math.max(96, (screenWidth - 44) / 3);
