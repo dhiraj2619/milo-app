@@ -27,6 +27,11 @@ export default function AudioRoomScreen({navigation, route}) {
   }, [isDemo]);
 
   useEffect(() => {
+    if (isDemo || unavailable || joined) return undefined;
+    const connectTimer = setTimeout(() => setJoined(true), 2400);
+    return () => clearTimeout(connectTimer);
+  }, [isDemo, joined, unavailable]);
+  useEffect(() => {
     if (!findingOther) return undefined;
     const startedAt = Date.now();
     const interval = setInterval(() => {
@@ -35,7 +40,7 @@ export default function AudioRoomScreen({navigation, route}) {
       if (nextProgress >= 100) {
         clearInterval(interval);
         const nextPerson = availablePeople.find(member => member._id !== initialPerson._id);
-        if (nextPerson) { setPerson(nextPerson); setUnavailable(false); setFindingOther(false); setMatchProgress(0); }
+        if (nextPerson) { setPerson(nextPerson); setUnavailable(false); setFindingOther(false); setMatchProgress(0); setJoined(true); }
       }
     }, 500);
     return () => clearInterval(interval);
@@ -64,7 +69,7 @@ export default function AudioRoomScreen({navigation, route}) {
   const lineScale = connectionPulse.interpolate({inputRange: [0, 1], outputRange: [0.15, 1]});
   const waveScale = activity.interpolate({inputRange: [0, 1], outputRange: [0.35, 1]});
   const waveOpacity = activity.interpolate({inputRange: [0, 0.75, 1], outputRange: [0.1, 0.95, 0.1]});
-  const callStatus = joined ? 'Connected - private room' : 'Waiting for you to join';  const statusText = joined ? 'Your private audio room is live' : 'Preparing a private audio room';
+  const callStatus = unavailable ? 'Match unavailable' : joined ? 'Connected - private room' : 'Ringing...';  const statusText = joined ? 'Your private audio room is live' : unavailable ? 'Matching you with another person' : 'Ringing your match...';
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom', 'left', 'right']}>
     <StatusBar barStyle="light-content" backgroundColor="#08091C" />
@@ -82,7 +87,7 @@ export default function AudioRoomScreen({navigation, route}) {
         <View style={styles.avatarFrame}>
           <Gradient from="#C56CFF" to="#5B23DF" radius={70} />
           <View style={styles.avatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /></View>
-          {!unavailable && <View style={styles.onlineDot}><Check size={9} color="#062015" strokeWidth={3} /></View>}
+          <View style={[styles.onlineDot, unavailable && styles.offlineDot]}>{!unavailable && <Check size={9} color="#062015" strokeWidth={3} />}</View>
         </View>
       </View>
       <Text style={styles.name}>{name}</Text>
@@ -91,7 +96,7 @@ export default function AudioRoomScreen({navigation, route}) {
 
     <View style={styles.statusCard}>
       <View style={styles.statusIcon}><Phone size={16} color="#D797FF" /></View>
-      <View style={styles.statusCopy}><Text style={styles.statusTitle}>{statusText}</Text><Text style={styles.statusSubtext}>{unavailable ? 'Please wait a moment.' : 'Only you and your match can hear this call.'}</Text></View>
+      <View style={styles.statusCopy}><Text style={styles.statusTitle}>{statusText}</Text><Text style={styles.statusSubtext}>{unavailable ? 'Please wait while we find another match.' : joined ? 'Only you and your match can hear this call.' : 'Waiting for their response.'}</Text></View>
       {!unavailable && <View style={styles.statusDots}><Animated.View style={[styles.statusDot, {opacity: waveOpacity, transform: [{scale: waveScale}]}]} /><Animated.View style={[styles.statusDot, styles.statusDotDim, {opacity: waveOpacity, transform: [{scale: waveScale}]}]} /><Animated.View style={[styles.statusDot, styles.statusDotDim, {opacity: waveOpacity, transform: [{scale: waveScale}]}]} /></View>}
     </View>
 
@@ -126,8 +131,8 @@ const styles = StyleSheet.create({
   privateLine: {flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -1}, privateText: {fontFamily: 'Poppins-Medium', fontSize: 9, color: '#AAA1C2'},
   hero: {alignItems: 'center', marginTop: 26}, avatarStage: {width: 158, height: 158, alignItems: 'center', justifyContent: 'center'},
   avatarFrame: {width: 112, height: 112, borderRadius: 56, padding: 4, overflow: 'visible'}, avatar: {flex: 1, borderRadius: 52, overflow: 'hidden'},
-  onlineDot: {position: 'absolute', right: 4, bottom: 5, width: 19, height: 19, borderRadius: 10, backgroundColor: '#31EB98', borderWidth: 2, borderColor: '#24105D', alignItems: 'center', justifyContent: 'center'},
-  name: {fontFamily: 'Poppins-SemiBold', fontSize: 22, color: '#FFFFFF', marginTop: 8}, callStatus: {fontFamily: 'Poppins-Regular', fontSize: 11, color: '#B4A8CD', marginTop: -2}, busyStatus: {color: '#FF92BF'},
+  onlineDot: {position: 'absolute', right: 2, top: 2, width: 19, height: 19, borderRadius: 10, backgroundColor: '#31EB98', borderWidth: 2, borderColor: '#24105D', alignItems: 'center', justifyContent: 'center'},
+  name: {fontFamily: 'Poppins-SemiBold', fontSize: 22, color: '#FFFFFF', marginTop: 8}, callStatus: {fontFamily: 'Poppins-Regular', fontSize: 11, color: '#B4A8CD', marginTop: -2}, busyStatus: {color: '#FF92BF'}, offlineDot: {backgroundColor: '#F5C542'},
   statusCard: {minHeight: 64, marginTop: 25, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(132, 91, 205, 0.62)', backgroundColor: 'rgba(35, 22, 74, 0.72)', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center'},
   statusIcon: {width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(134, 58, 222, 0.22)', alignItems: 'center', justifyContent: 'center'}, statusCopy: {flex: 1, marginLeft: 10}, statusTitle: {fontFamily: 'Poppins-Medium', fontSize: 12, color: '#F7F2FF'}, statusSubtext: {fontFamily: 'Poppins-Regular', fontSize: 9, color: '#AFA4C8', marginTop: 1},
   statusDots: {flexDirection: 'row', gap: 4}, statusDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: '#CB71FF'}, statusDotDim: {opacity: 0.38},

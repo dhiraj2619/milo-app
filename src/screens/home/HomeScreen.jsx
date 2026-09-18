@@ -144,8 +144,8 @@ function ConnectProfileCard({ person, cardWidth, onPress }) {
   const isOffline = person.isOnline !== true;
   return <View style={[styles.connectCard, { width: cardWidth }]}>
     <Gradient from="#34455F" to="#080D17" radius={16} />
-    <View style={styles.connectTop}><View style={styles.presenceBadge}><View style={[styles.presenceDot, isOffline && styles.offlineDot]} /><Text style={styles.presenceText}>{isOffline ? 'Offline' : 'Online'}</Text></View><View style={styles.connectMore}><MoreHorizontal size={15} color="#F3EDFF" /></View></View>
-    <View style={styles.connectAvatar}><ProfileAvatar {...person.avatarStyle} name={person.nickname} /></View>
+    <View style={styles.connectTop}><View /><View style={styles.connectMore}><MoreHorizontal size={15} color="#F3EDFF" /></View></View>
+    <View style={styles.connectAvatar}><ProfileAvatar {...person.avatarStyle} name={person.nickname} /><View style={[styles.profilePresenceDot, isOffline && styles.offlineDot]} /></View>
     <Text numberOfLines={1} style={styles.connectName}>{person.nickname} {person.age || 22}</Text>
     <View style={styles.connectTags}><View style={styles.connectTag}><Text style={styles.connectTagText}>{languageLabel(person.languages[0])}</Text></View></View>
     <Pressable onPress={() => onPress(person)} style={[styles.connectCallButton, isOffline && styles.disabledAction]}><Phone size={16} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.connectCallText}>Join Call</Text></Pressable>
@@ -156,8 +156,8 @@ function MiloChatCard({ person, cardWidth, onPress }) {
   const name = person.nickname || person.name || 'MILO member';
   return <Pressable accessibilityRole="button" accessibilityLabel={`Chat with ${name}`} onPress={() => onPress(person)} style={[styles.miloChatCard, { width: cardWidth }]}>
     <Gradient from="#45637F" to="#151A2B" radius={14} />
-    <View style={styles.miloChatTop}><View style={styles.presenceBadge}><View style={[styles.presenceDot, isOffline && styles.offlineDot]} /><Text style={styles.presenceText}>{isOffline ? 'Offline' : 'Online'}</Text></View><MoreHorizontal size={15} color="#EDE8F8" /></View>
-    <View style={styles.miloChatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /></View>
+    <View style={styles.miloChatTop}><View /><MoreHorizontal size={15} color="#EDE8F8" /></View>
+    <View style={styles.miloChatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /><View style={[styles.profilePresenceDot, isOffline && styles.offlineDot]} /></View>
     <Text numberOfLines={1} style={styles.miloChatName}>{name} {person.age || ''}</Text>
     <Text numberOfLines={1} style={styles.miloChatLanguage}>{languageLabel(person.languages?.[0] || 'English')}</Text>
     <View style={styles.miloChatButton}><MessageCircle size={14} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.miloChatButtonText}>Chat</Text></View>
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
   featuredActionText: { fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 9 },
   presenceBadge: { backgroundColor: 'rgba(17,18,29,0.72)', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
   presenceDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#19E58A' },
-  offlineDot: { backgroundColor: '#8A8493' },
+  offlineDot: { backgroundColor: '#F5C542' }, profilePresenceDot: {position: 'absolute', top: 2, right: 2, width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: '#111525', backgroundColor: '#19E58A'},
   presenceText: { fontSize: 8, color: '#FFFFFF', fontFamily: 'Poppins-Medium' },
   disabledAction: { opacity: 0.68 },
   newBadge: {
