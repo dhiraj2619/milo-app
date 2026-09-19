@@ -34,6 +34,7 @@ import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 import { claimDailyCoins } from '../../services/coinService';
+import { getConversations } from '../../services/chatService';
 import { consumeWelcomeReward } from '../../services/sessionService';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { io } from 'socket.io-client';
@@ -143,7 +144,6 @@ const languageLabel = language => LANGUAGE_LABELS[language] || language;
 function ConnectProfileCard({ person, cardWidth, onPress }) {
   const isOffline = person.isOnline !== true;
   return <View style={[styles.connectCard, { width: cardWidth }]}>
-    <Gradient from="#34455F" to="#080D17" radius={16} />
     <View style={styles.connectTop}><View /><View style={styles.connectMore}><MoreHorizontal size={15} color="#F3EDFF" /></View></View>
     <View style={styles.connectAvatar}><ProfileAvatar {...person.avatarStyle} name={person.nickname} /><View style={[styles.profilePresenceDot, isOffline && styles.offlineDot]} /></View>
     <Text numberOfLines={1} style={styles.connectName}>{person.nickname} {person.age || 22}</Text>
@@ -151,16 +151,23 @@ function ConnectProfileCard({ person, cardWidth, onPress }) {
     <Pressable onPress={() => onPress(person)} style={[styles.connectCallButton, isOffline && styles.disabledAction]}><Phone size={16} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.connectCallText}>Join Call</Text></Pressable>
   </View>;
 }
+function SeeMoreRoomsCard({ cardWidth, onPress }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel="See more rooms" onPress={onPress} style={[styles.seeMoreRoomsCard, { width: cardWidth }]}>
+    <View style={styles.seeMoreRoomsIcon}><Phone size={22} color="#DDBBFF" /></View>
+    <Text style={styles.seeMoreRoomsTitle}>See more rooms</Text>
+    <Text style={styles.seeMoreRoomsText}>Find your next conversation</Text>
+    <View style={styles.seeMoreRoomsArrow}><ChevronRight size={22} color="#FFFFFF" /></View>
+  </Pressable>;
+}
 function MiloChatCard({ person, cardWidth, onPress }) {
   const isOffline = person.isOnline !== true;
   const name = person.nickname || person.name || 'MILO member';
   return <Pressable accessibilityRole="button" accessibilityLabel={`Chat with ${name}`} onPress={() => onPress(person)} style={[styles.miloChatCard, { width: cardWidth }]}>
-    <Gradient from="#45637F" to="#151A2B" radius={14} />
     <View style={styles.miloChatTop}><View /><MoreHorizontal size={15} color="#EDE8F8" /></View>
     <View style={styles.miloChatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /><View style={[styles.profilePresenceDot, isOffline && styles.offlineDot]} /></View>
     <Text numberOfLines={1} style={styles.miloChatName}>{name} {person.age || ''}</Text>
     <Text numberOfLines={1} style={styles.miloChatLanguage}>{languageLabel(person.languages?.[0] || 'English')}</Text>
-    <View style={styles.miloChatButton}><MessageCircle size={14} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.miloChatButtonText}>Chat</Text></View>
+    <View style={styles.miloChatButton}><Image source={require('../../../assets/icons/message.png')} style={styles.miloChatButtonIcon} resizeMode="contain" /><Text style={styles.miloChatButtonText}>Chat</Text></View>
   </Pressable>;
 } function WelcomeRewardModal({ reward, onClose }) {
   if (!reward) return null;
@@ -206,6 +213,9 @@ export default function HomeScreen({ navigation }) {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [countdownReady, setCountdownReady] = useState(false);
   const [dailyClaimOpen, setDailyClaimOpen] = useState(false);
+  const [dailyClaimed, setDailyClaimed] = useState(false);
+  const dailyCoinPulse = React.useRef(new Animated.Value(0)).current;
+  const dailySparkles = React.useRef(new Animated.Value(0)).current;
   const [welcomeReward, setWelcomeReward] = useState(null);
   const [profile, setProfile] = useState(null);
   const [people, setPeople] = useState([]);
@@ -214,6 +224,7 @@ export default function HomeScreen({ navigation }) {
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [unreadChats, setUnreadChats] = useState(0);
   const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
   const claimDailyReward = async () => {
@@ -222,7 +233,8 @@ export default function HomeScreen({ navigation }) {
     try {
       const wallet = await claimDailyCoins();
       setProfile(current => ({ ...current, coinBalance: wallet.coinBalance, lastDailyCoinClaimAt: wallet.claimedAt }));
-      setDailyClaimOpen(false);
+      setDailyClaimed(true);
+      setTimeout(() => { setDailyClaimOpen(false); setDailyClaimed(false); }, 1200);
       toast('70 daily coins added to your wallet!');
     } catch (error) {
       toast(error.response?.data?.message || 'Your daily coins are not ready yet.');
@@ -231,7 +243,29 @@ export default function HomeScreen({ navigation }) {
     }
   };
   React.useEffect(() => {
+    if (!dailyClaimOpen || dailyClaimed) return undefined;
+    dailyCoinPulse.setValue(0);
+    dailySparkles.setValue(0);
+    const coinLoop = Animated.loop(Animated.sequence([
+      Animated.timing(dailyCoinPulse, {toValue: 1, duration: 720, useNativeDriver: true}),
+      Animated.timing(dailyCoinPulse, {toValue: 0, duration: 720, useNativeDriver: true}),
+    ]));
+    const sparkleLoop = Animated.loop(Animated.timing(dailySparkles, {toValue: 1, duration: 1200, useNativeDriver: true}));
+    coinLoop.start();
+    sparkleLoop.start();
+    return () => { coinLoop.stop(); sparkleLoop.stop(); dailyCoinPulse.stopAnimation(); dailySparkles.stopAnimation(); };
+  }, [dailyClaimOpen, dailyClaimed, dailyCoinPulse, dailySparkles]);
+  React.useEffect(() => {
     getMyProfile().then(setProfile).catch(() => { });
+  }, []);
+  React.useEffect(() => {
+    let mounted = true;
+    getConversations()
+      .then(conversations => {
+        if (mounted) setUnreadChats(conversations.reduce((total, conversation) => total + (conversation.unreadCount || 0), 0));
+      })
+      .catch(() => { });
+    return () => { mounted = false; };
   }, []);
   React.useEffect(() => {
     const updateCountdown = () => {
@@ -282,6 +316,13 @@ export default function HomeScreen({ navigation }) {
           if (!mounted) return;
           setPeople(current => current.map(person => person.firebaseUid === presence.firebaseUid ? { ...person, isOnline: presence.isOnline, lastSeen: presence.lastSeen || null } : person));
         });
+        socket.on('chat:updated', () => {
+          getConversations()
+            .then(conversations => {
+              if (mounted) setUnreadChats(conversations.reduce((total, conversation) => total + (conversation.unreadCount || 0), 0));
+            })
+            .catch(() => { });
+        });
       } catch (_) { }
     };
     connectPresence();
@@ -294,14 +335,21 @@ export default function HomeScreen({ navigation }) {
     if (preferredGender === 'female') return personGender === 'male';
     return true;
   };
-  const matchingPeople = people.filter(matchesGenderPreference);
+  const relevantLanguages = new Set((profile?.languages || []).map(language => language.toLowerCase()));
+  if (relevantLanguages.has('marathi')) relevantLanguages.add('hindi');
+  const matchesLanguagePreference = person => {
+    if (!relevantLanguages.size) return true;
+    return (person.languages || []).some(language => relevantLanguages.has(language.toLowerCase()));
+  };
+  const matchingPeople = people.filter(person => matchesGenderPreference(person) && matchesLanguagePreference(person));
   const visiblePeople = filter === 'Online' ? matchingPeople.filter(person => person.isOnline === true) : matchingPeople;
   const connectProfiles = [
     ...matchingPeople.filter(person => person.isOnline === true),
-    ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo').filter(matchesGenderPreference),
+    ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo').filter(person => matchesGenderPreference(person) && matchesLanguagePreference(person)),
   ];  const joinCall = person => {
     navigation.navigate('AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
   };
+  const connectRooms = [...connectProfiles, { _id: 'see-more-rooms', type: 'seeMore' }];
   const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);
   const miloChatCardWidth = Math.max(96, (screenWidth - 44) / 3);
   const loadMoreProfiles = async () => {
@@ -340,9 +388,6 @@ export default function HomeScreen({ navigation }) {
       edges={['top', 'bottom', 'left', 'right']}
     >
       <StatusBar barStyle="light-content" backgroundColor="#0B0D20" />
-      <View style={styles.ambient} pointerEvents="none">
-        <Gradient from="#171A40" to="#080910" radius={0} />
-      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -422,9 +467,9 @@ export default function HomeScreen({ navigation }) {
         <SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
         <FlatList
           horizontal
-          data={connectProfiles}
+          data={connectRooms}
           keyExtractor={item => item._id}
-          renderItem={({ item }) => <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={joinCall} />}
+          renderItem={({ item }) => item.type === 'seeMore' ? <SeeMoreRoomsCard cardWidth={connectCardWidth} onPress={() => preview('More rooms')} /> : <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={joinCall} />}
           showsHorizontalScrollIndicator={false}
           decelerationRate="fast"
           snapToInterval={connectCardWidth + 10}
@@ -443,15 +488,14 @@ export default function HomeScreen({ navigation }) {
         {!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>{filter === 'Online' ? 'No registered members are online yet.' : 'Registered members will appear here.'}</Text>}
         <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
           <Gradient from="#3D255F" to="#8D39E8" radius={15} />
-          <Text style={styles.crown}>♛</Text>
+          <Image source={require('../../../assets/icons/crown.png')} style={styles.crown} resizeMode="contain" />
           <View style={styles.premiumCopy}><Text style={styles.premiumTitle}>Go Premium</Text><Text style={styles.premiumText}>Get more visibility, unlock filters{`\n`}and enjoy better matches.</Text></View>
           <View style={styles.upgrade}><Text style={styles.upgradeText}>Upgrade</Text><ChevronRight size={15} color="#FFFFFF" /></View>
         </Pressable>
       </ScrollView>
       <WelcomeRewardModal reward={welcomeReward} onClose={() => setWelcomeReward(null)} />
-      <Modal transparent animationType="fade" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={() => setDailyClaimOpen(false)}><View style={styles.dailyClaimOverlay}><View style={styles.dailyClaimCard}><View style={styles.dailyClaimBackground} /><Gradient from="#32106D" to="#100622" radius={24} glow /><View style={styles.dailyClaimGlow} /><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailyClaimClose}><X size={18} color="#F5EEFF" /></Pressable><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /><Text style={styles.dailyClaimTitle}>Daily coins are ready!</Text><Text style={styles.dailyClaimBody}>Claim your 70 free coins for today.</Text><Pressable disabled={claimingCoins} onPress={claimDailyReward} style={styles.dailyClaimButton}><Gradient from="#BD58FF" to="#6D24EF" radius={18} /><Text style={styles.dailyClaimButtonText}>{claimingCoins ? 'Claiming…' : 'Claim 70 coins'}</Text></Pressable></View></View></Modal>
+<Modal transparent animationType="slide" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={() => setDailyClaimOpen(false)}><View style={styles.dailySheetOverlay}><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailySheetBackdrop} /><View style={styles.dailySheet}><View style={styles.dailySheetBackground} /><View style={styles.dailySheetGlow} /><View style={styles.sheetHandle} /><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailyClaimClose}><X size={20} color="#F5EEFF" /></Pressable><View style={styles.dailyCoinStage}><Animated.Text style={[styles.claimSparkle, styles.claimSparkleLeft, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.3, 1, 0.3]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['0deg', '45deg']})}]}]}>✦</Animated.Text><Animated.View style={{transform: [{scale: dailyCoinPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.08]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /></Animated.View><Animated.Text style={[styles.claimSparkle, styles.claimSparkleRight, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.25, 1]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [-7, 8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['45deg', '0deg']})}]}]}>✦</Animated.Text></View><Text style={styles.dailyClaimTitle}>{dailyClaimed ? 'Coins claimed!' : 'Daily coins are ready!'}</Text><Text style={styles.dailyClaimBody}>{dailyClaimed ? '70 coins were added to your wallet.' : 'Claim your 70 free coins for today.'}</Text><Pressable disabled={claimingCoins || dailyClaimed} onPress={claimDailyReward} style={[styles.dailyClaimButton, dailyClaimed && styles.dailyClaimedButton]}><Gradient from="#C05BFF" to="#7025F0" radius={23} /><Coin size={25} /><Text style={styles.dailyClaimButtonText}>{dailyClaimed ? 'Claimed' : claimingCoins ? 'Claiming...' : 'Claim 70 coins'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable></View></View></Modal>
       <View style={styles.bottomBar}>
-        <Gradient from="#28214C" to="#0A0B17" radius={22} opacity={0.84} />
         {TABS.map(({ label, icon: Icon }) => (
           <Pressable
             key={label}
@@ -461,16 +505,8 @@ export default function HomeScreen({ navigation }) {
             style={styles.navItem}
           >
             <View style={label === 'Home' && styles.homeGlow}>
-              <Icon
-                size={23}
-                color={label === 'Home' ? '#BA5BFF' : '#BCB9CC'}
-                fill="none"
-              />
-              {label === 'Chats' && (
-                <View style={styles.navBadge}>
-                  <Text style={styles.navBadgeText}>3</Text>
-                </View>
-              )}
+              {label === 'Chats' ? <Image source={require('../../../assets/icons/message.png')} style={styles.navMessageIcon} resizeMode="contain" /> : <Icon size={23} color={label === 'Home' ? '#BA5BFF' : '#BCB9CC'} fill="none" />}
+              {label === 'Chats' && unreadChats > 0 && <View style={styles.navUnreadDot} />}
             </View>
             <Text
               style={[styles.navLabel, label === 'Home' && styles.activeNav]}
@@ -513,7 +549,6 @@ const styles = StyleSheet.create({
   welcomeButton: { height: 48, width: '100%', marginTop: 15, marginBottom: 16, borderRadius: 19, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   welcomeButtonText: { fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14 }, screen: { flex: 1, backgroundColor: '#080910' },
   flex: { flex: 1 },
-  ambient: { position: 'absolute', top: 0, left: 0, right: 0, height: 180 },
   content: {
     paddingHorizontal: 14,
     paddingTop: 8,
@@ -564,16 +599,22 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#FF426C',
   },
-  dailyClaimOverlay: {flex: 1, backgroundColor: 'rgba(3,2,12,0.76)', alignItems: 'center', justifyContent: 'center', padding: 24},
-  dailyClaimCard: {width: '100%', maxWidth: 340, minHeight: 278, borderRadius: 24, borderWidth: 1, borderColor: '#A05AED', backgroundColor: '#160A35', overflow: 'hidden', alignItems: 'center', paddingHorizontal: 24, paddingTop: 26, paddingBottom: 22},
-  dailyClaimBackground: {...StyleSheet.absoluteFillObject, backgroundColor: '#160A35'},
-  dailyClaimGlow: {position: 'absolute', top: -75, right: -45, width: 230, height: 230, borderRadius: 115, backgroundColor: 'rgba(244, 98, 193, 0.27)'},
-  dailyClaimClose: {position: 'absolute', zIndex: 2, top: 12, right: 12, width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: '#7757A3', backgroundColor: 'rgba(25,12,52,0.72)', alignItems: 'center', justifyContent: 'center'},
-  dailyClaimCoin: {width: 112, height: 112, marginBottom: 6},
-  dailyClaimTitle: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 22, textAlign: 'center'},
-  dailyClaimBody: {fontFamily: 'Poppins-Regular', color: '#D6C9E6', fontSize: 12, textAlign: 'center', marginTop: 5},
-  dailyClaimButton: {height: 48, width: '100%', marginTop: 20, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center'},
-  dailyClaimButtonText: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14},  reward: {height: 170, borderRadius: 24, borderWidth: 1, borderColor: '#633486', backgroundColor: '#0B0A1C', overflow: 'hidden', paddingHorizontal: 18, paddingTop: 15, shadowColor: '#7C42B9', shadowOpacity: 0.24, shadowRadius: 14, shadowOffset: {width: 0, height: 6}},
+  reward: { minHeight: 175, borderRadius: 24, overflow: 'hidden', paddingHorizontal: 12, paddingTop: 15, paddingBottom: 12 },
+dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(3,2,12,0.72)'},
+  dailySheetBackdrop: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
+  dailySheet: {position: 'absolute', left: 0, right: 0, bottom: 0, width: '100%', alignSelf: 'stretch', minHeight: 420, backgroundColor: '#0d1117', borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderBottomWidth: 0, borderColor: '#A65CF2', overflow: 'hidden', alignItems: 'center', paddingHorizontal: 26, paddingTop: 18, paddingBottom: 32},
+  dailySheetBackground: {...StyleSheet.absoluteFillObject, backgroundColor: '#0d1117'},
+  dailySheetGlow: {position: 'absolute', top: -110, right: -35, width: 270, height: 270, borderRadius: 140, backgroundColor: 'rgba(247, 91, 194, 0.25)'},
+  sheetHandle: {width: 44, height: 5, borderRadius: 3, backgroundColor: '#BB8DF4', marginBottom: 17},
+  dailyClaimClose: {position: 'absolute', zIndex: 2, top: 20, right: 20, width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: '#8C62BB', backgroundColor: 'rgba(31,16,64,0.65)', alignItems: 'center', justifyContent: 'center'},
+  dailyCoinStage: {width: 150, height: 145, alignItems: 'center', justifyContent: 'center'},
+  dailyClaimCoin: {width: 130, height: 130},
+  claimSparkle: {position: 'absolute', fontSize: 31, color: '#FFE25A'}, claimSparkleLeft: {left: 2, top: 41}, claimSparkleRight: {right: 0, top: 71},
+  dailyClaimTitle: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 25, textAlign: 'center'},
+  dailyClaimBody: {fontFamily: 'Poppins-Regular', color: '#DCCCEB', fontSize: 13, textAlign: 'center', marginTop: 5},
+  dailyClaimButton: {height: 55, width: '100%', marginTop: 28, borderRadius: 27, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8},
+  dailyClaimedButton: {opacity: 0.72},
+  dailyClaimButtonText: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 15},
   rewardTopGlow: {position: 'absolute', top: -82, left: -54, right: -35, height: 151, borderBottomLeftRadius: 210, borderBottomRightRadius: 210, backgroundColor: 'rgba(129, 67, 201, 0.15)', transform: [{rotate: '-6deg'}]},
   rewardDiagonalGlow: {position: 'absolute', top: 16, right: -88, width: 316, height: 92, borderRadius: 90, backgroundColor: 'rgba(57, 29, 119, 0.34)', transform: [{rotate: '-17deg'}]},
   rewardHeader: { height: 26, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -628,7 +669,12 @@ const styles = StyleSheet.create({
   seeAll: { flexDirection: 'row', alignItems: 'center' },
   seeAllText: { fontSize: 10, color: '#B37AFF' },
   connectList: { paddingRight: 14, gap: 10 },
-  connectCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#616F94', backgroundColor: '#1C2133', padding: 8 },
+  connectCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', padding: 8 },
+  seeMoreRoomsCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', padding: 18, justifyContent: 'center', alignItems: 'center' },
+  seeMoreRoomsIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(180, 96, 255, 0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  seeMoreRoomsTitle: { color: '#FFFFFF', fontFamily: 'Poppins-SemiBold', fontSize: 15, textAlign: 'center' },
+  seeMoreRoomsText: { color: '#B9B0CB', fontFamily: 'Poppins-Regular', fontSize: 10, textAlign: 'center', marginTop: 5 },
+  seeMoreRoomsArrow: { position: 'absolute', right: 13, bottom: 13, width: 32, height: 32, borderRadius: 16, backgroundColor: '#823AF1', alignItems: 'center', justifyContent: 'center' },
   connectTop: { height: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 },
   connectMore: { width: 21, height: 21, borderRadius: 11, backgroundColor: 'rgba(10,9,22,0.46)', alignItems: 'center', justifyContent: 'center' },
   connectAvatar: { position: 'absolute', left: '50%', marginLeft: -48, top: 27, width: 96, height: 96, overflow: 'hidden', borderRadius: 48, backgroundColor: 'transparent' },
@@ -639,12 +685,13 @@ const styles = StyleSheet.create({
   connectCallButton: { position: 'absolute', left: 8, right: 8, bottom: 9, height: 38, borderRadius: 20, backgroundColor: '#873BF1', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 },
   connectCallText: { fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 11 },
   miloChatRow: { flexDirection: 'row', gap: 7 },
-  miloChatCard: { height: 185, borderRadius: 14, borderWidth: 1, borderColor: '#465675', overflow: 'hidden', padding: 7 },
+  miloChatCard: { height: 185, borderRadius: 14, borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', overflow: 'hidden', padding: 7 },
   miloChatTop: { height: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   miloChatAvatar: { width: 60, height: 60, borderRadius: 30, overflow: 'hidden', alignSelf: 'center', marginTop: 1, backgroundColor: '#A8D0F5' },
   miloChatName: { fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 11, marginTop: 5 },
   miloChatLanguage: { fontFamily: 'Poppins-Medium', color: '#F3ECFB', fontSize: 11, marginTop: 4 },
-  miloChatButton: { height: 33, position: 'absolute', left: 7, right: 7, bottom: 10, borderRadius: 13, backgroundColor: '#8F39F2', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  miloChatButton: { height: 33, position: 'absolute', left: 7, right: 7, bottom: 10, borderRadius: 13, backgroundColor: '#B863FF', borderWidth: 1, borderColor: '#2B1046', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  miloChatButtonIcon: { width: 15, height: 15, tintColor: '#FFFFFF' },
   miloChatButtonText: { fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 11 },
   miloChatEmpty: { color: '#A9A1B9', fontSize: 11, textAlign: 'center', paddingVertical: 24 },
   cardRow: { flexDirection: 'row', gap: 7 },
@@ -704,7 +751,7 @@ const styles = StyleSheet.create({
   emptyText: { color: '#AAA3B6', fontSize: 11, textAlign: 'center', marginTop: 5 },
   endText: { color: '#888095', fontSize: 11, textAlign: 'center', marginTop: 14 },
   premiumBanner: { height: 66, marginTop: 24, borderRadius: 15, borderWidth: 1, borderColor: '#9E5CEB', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
-  crown: { fontSize: 34, color: '#FFD643', marginRight: 9 },
+  crown: { width: 34, height: 34, marginRight: 9 },
   premiumCopy: { flex: 1 },
   premiumTitle: { color: '#FFE549', fontFamily: 'Poppins-SemiBold', fontSize: 15 },
   premiumText: { color: '#F1DFFF', fontSize: 8, lineHeight: 11, marginTop: 1 },
@@ -717,10 +764,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#4F426A',
     borderRadius: 22,
+    backgroundColor: 'rgba(21, 24, 35, 0.92)',
+    shadowColor: '#000000',
+    shadowOpacity: 0.36,
+    shadowRadius: 14,
+    shadowOffset: {width: 0, height: 5},
+    elevation: 10,
     flexDirection: 'row',
     overflow: 'hidden',
   },
   navItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 6 },
+  navMessageIcon: { width: 22, height: 22, tintColor: '#BCB9CC' },
   navLabel: { color: '#C5BED3', fontSize: 9, textAlign: 'center' },
   activeNav: { color: '#CE88FF', fontWeight: '700' },
   homeGlow: {
@@ -729,18 +783,17 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
   },
-  navBadge: {
+  navUnreadDot: {
     position: 'absolute',
-    right: -7,
-    top: -7,
-    width: 17,
-    height: 17,
-    borderRadius: 9,
+    right: -5,
+    top: -5,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#F94668',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#0D0E1C',
   },
-  navBadgeText: { color: '#FFFFFF', fontSize: 10 },
   drawerLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20, flexDirection: 'row' },
   drawerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)' },
   drawer: { width: '86%', maxWidth: 390, height: '100%', paddingHorizontal: 24, paddingTop: 22, backgroundColor: '#121021', borderLeftWidth: 1, borderColor: '#4B3A69', shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 18, elevation: 18 },

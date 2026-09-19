@@ -15,6 +15,7 @@ const MainNavigator = () => {
       <Stack.Screen name="Chats" component={ChatsScreen} />
       <Stack.Screen name="ChatConversation" component={ChatConversationScreen} />
       <Stack.Screen name="AudioRoom" component={AudioRoomScreen} />
+      <Stack.Screen name="VideoRoom" component={AudioRoomScreen} />
     </Stack.Navigator>
   );
 };

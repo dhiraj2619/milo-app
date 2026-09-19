@@ -1,12 +1,13 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, Animated, Easing, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {ArrowLeft, Check, Mic, MoreHorizontal, Phone, ShieldCheck, Volume2} from 'lucide-react-native';
+import {ArrowLeft, Check, Mic, MoreHorizontal, Phone, PhoneOff, ShieldCheck, Volume2} from 'lucide-react-native';
 import {Gradient} from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 
 export default function AudioRoomScreen({navigation, route}) {
   const initialPerson = route.params?.person || {};
+  const callType = route.params?.callType || 'audio';
   const [person, setPerson] = useState(initialPerson);
   const availablePeople = useMemo(() => Array.isArray(route.params?.availablePeople) ? route.params.availablePeople : [], [route.params?.availablePeople]);
   const isDemo = route.params?.isDemo === true;
@@ -78,8 +79,8 @@ export default function AudioRoomScreen({navigation, route}) {
 
     <View style={styles.header}>
       <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.headerButton}><ArrowLeft size={21} color="#F6F0FF" /></Pressable>
-      <View style={styles.headerCopy}><Text style={styles.headerTitle}>Audio Room</Text><View style={styles.privateLine}><ShieldCheck size={11} color="#35DF9B" /><Text style={styles.privateText}>Private</Text></View></View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Room options" style={styles.headerButton}><MoreHorizontal size={22} color="#F6F0FF" /></Pressable>
+      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{callType === 'video' ? 'Video Room' : 'Audio Room'}</Text><View style={styles.privateLine}><ShieldCheck size={11} color="#35DF9B" /><Text style={styles.privateText}>Private</Text></View></View>
+      <Pressable accessibilityRole="button" accessibilityLabel="End call" onPress={() => navigation.goBack()} style={[styles.headerButton, styles.hangupButton]}><PhoneOff size={20} color="#FF9BB3" /></Pressable>
     </View>
 
     <View style={styles.hero}>
@@ -115,7 +116,7 @@ export default function AudioRoomScreen({navigation, route}) {
     <View style={styles.controls}>
       <Pressable accessibilityRole="button" style={styles.control}><Mic size={21} color="#F0E8FC" /><Text style={styles.controlText}>Mic</Text></Pressable>
       <Pressable accessibilityRole="button" style={styles.control}><Volume2 size={21} color="#F0E8FC" /><Text style={styles.controlText}>Speaker</Text></Pressable>
-      <Pressable accessibilityRole="button" disabled={unavailable} onPress={() => setJoined(value => !value)} style={[styles.joinButton, unavailable && styles.joinDisabled]}><Gradient from="#D65CFF" to="#6822F1" radius={27} /><Phone size={21} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.joinText}>{joined ? 'Leave Room' : 'Join Room'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={unavailable} onPress={() => joined ? navigation.goBack() : setJoined(true)} style={[styles.joinButton, unavailable && styles.joinDisabled]}><Gradient from="#D65CFF" to="#6822F1" radius={27} /><Phone size={21} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.joinText}>{joined ? 'Leave Room' : 'Join Room'}</Text></Pressable>
       <Pressable accessibilityRole="button" style={styles.control}><MoreHorizontal size={22} color="#F0E8FC" /><Text style={styles.controlText}>More</Text></Pressable>
     </View>
   </SafeAreaView>;
@@ -127,6 +128,7 @@ const styles = StyleSheet.create({
   sideGlow: {position: 'absolute', top: 128, right: -132, width: 278, height: 370, borderRadius: 160, backgroundColor: 'rgba(62, 28, 131, 0.23)'},
   header: {height: 68, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   headerButton: {width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(31, 27, 67, 0.78)', borderWidth: 1, borderColor: '#393263', alignItems: 'center', justifyContent: 'center'},
+  hangupButton: {backgroundColor: 'rgba(88, 24, 56, 0.86)', borderColor: '#A64162'},
   headerCopy: {alignItems: 'center'}, headerTitle: {fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#FFFFFF'},
   privateLine: {flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: -1}, privateText: {fontFamily: 'Poppins-Medium', fontSize: 9, color: '#AAA1C2'},
   hero: {alignItems: 'center', marginTop: 26}, avatarStage: {width: 158, height: 158, alignItems: 'center', justifyContent: 'center'},
