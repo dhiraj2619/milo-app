@@ -27,6 +27,7 @@ import {
   Sparkles,
   Star,
   UserRound,
+  Video,
   X,
 } from 'lucide-react-native';
 import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
@@ -159,6 +160,21 @@ function SeeMoreRoomsCard({ cardWidth, onPress }) {
     <View style={styles.seeMoreRoomsArrow}><ChevronRight size={22} color="#FFFFFF" /></View>
   </Pressable>;
 }
+function OnlineProfileRow({person, onPress}) {
+  const name = person.nickname || person.name || 'MILO member';
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Join call with ${name}`} onPress={() => onPress(person)} style={styles.onlineProfileRow}>
+    <View style={styles.onlineProfileAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /><View style={styles.onlineProfileDot} /></View>
+    <View style={styles.onlineProfileCopy}><View style={styles.onlineProfileStatus}><View style={styles.onlineProfileStatusDot} /><Text style={styles.onlineProfileStatusText}>Online</Text></View><Text style={styles.onlineProfileName}>{name}</Text><View style={styles.onlineProfileLanguage}><Text style={styles.onlineProfileLanguageText}>{languageLabel(person.languages?.[0] || 'English')}</Text></View></View>
+    <Pressable onPress={() => onPress(person)} style={styles.onlineProfileCall}><Phone size={14} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.onlineProfileCallText}>Join Call</Text></Pressable>
+    <MoreHorizontal size={15} color="#A7A0B9" style={styles.onlineProfileMore} />
+  </Pressable>;
+}
+function NearbyRadar({profile, people, city, wave}) {
+  const positions = [{top: '4%', left: '43%'}, {top: '20%', right: '8%'}, {top: '48%', right: '3%'}, {bottom: '8%', right: '24%'}, {bottom: '9%', left: '21%'}, {top: '48%', left: '4%'}, {top: '22%', left: '9%'}];
+  const rippleScale = wave.interpolate({inputRange: [0, 1], outputRange: [0.55, 1]});
+  const rippleOpacity = wave.interpolate({inputRange: [0, 0.72, 1], outputRange: [0, 0.75, 0]});
+  return <View style={styles.nearbyRadar}><Animated.View style={[styles.radarRing, styles.radarRingOuter, {opacity: rippleOpacity, transform: [{scale: rippleScale}]}]} /><Animated.View style={[styles.radarRing, styles.radarRingMiddle, {opacity: rippleOpacity, transform: [{scale: rippleScale}]}]} /><Animated.View style={[styles.radarRing, styles.radarRingInner, {opacity: rippleOpacity, transform: [{scale: rippleScale}]}]} /><View style={styles.radarGlow} /><View style={styles.radarCenter}><ProfileAvatar {...(profile?.avatarStyle || {avatarSeed: profile?.avatarSeed || 'milo-user', gender: profile?.gender || 'female'})} name={profile?.nickname || 'You'} photoUrl={profile?.photoUrl} /><View style={styles.radarCenterDot} /><Text style={styles.radarYou}>You</Text><Text style={styles.radarCity}>{city}</Text></View>{people.map((person, index) => <View key={person._id || person.firebaseUid} style={[styles.radarPerson, positions[index % positions.length]]}><View style={styles.radarPersonAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={person.nickname} photoUrl={person.photoUrl} /><View style={styles.radarPersonDot} /></View><Text style={styles.radarDistance}>{[0.4, 0.8, 1.2, 1.6, 1.9, 2.1, 2.8][index % 7]} km</Text></View>)}</View>;
+}
 function MiloChatCard({ person, cardWidth, onPress }) {
   const isOffline = person.isOnline !== true;
   const name = person.nickname || person.name || 'MILO member';
@@ -214,8 +230,11 @@ export default function HomeScreen({ navigation }) {
   const [countdownReady, setCountdownReady] = useState(false);
   const [dailyClaimOpen, setDailyClaimOpen] = useState(false);
   const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [claimSuccessOpen, setClaimSuccessOpen] = useState(false);
   const dailyCoinPulse = React.useRef(new Animated.Value(0)).current;
   const dailySparkles = React.useRef(new Animated.Value(0)).current;
+  const claimSuccessPulse = React.useRef(new Animated.Value(0)).current;
+  const claimSuccessSparkles = React.useRef(new Animated.Value(0)).current;
   const [welcomeReward, setWelcomeReward] = useState(null);
   const [profile, setProfile] = useState(null);
   const [people, setPeople] = useState([]);
@@ -225,6 +244,8 @@ export default function HomeScreen({ navigation }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [unreadChats, setUnreadChats] = useState(0);
+  const [nearbyRevealCount, setNearbyRevealCount] = useState(0);
+  const nearbyWave = React.useRef(new Animated.Value(0)).current;
   const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
   const claimDailyReward = async () => {
@@ -233,9 +254,9 @@ export default function HomeScreen({ navigation }) {
     try {
       const wallet = await claimDailyCoins();
       setProfile(current => ({ ...current, coinBalance: wallet.coinBalance, lastDailyCoinClaimAt: wallet.claimedAt }));
-      setDailyClaimed(true);
-      setTimeout(() => { setDailyClaimOpen(false); setDailyClaimed(false); }, 1200);
-      toast('70 daily coins added to your wallet!');
+      setDailyClaimOpen(false);
+      setDailyClaimed(false);
+      setClaimSuccessOpen(true);
     } catch (error) {
       toast(error.response?.data?.message || 'Your daily coins are not ready yet.');
     } finally {
@@ -255,6 +276,18 @@ export default function HomeScreen({ navigation }) {
     sparkleLoop.start();
     return () => { coinLoop.stop(); sparkleLoop.stop(); dailyCoinPulse.stopAnimation(); dailySparkles.stopAnimation(); };
   }, [dailyClaimOpen, dailyClaimed, dailyCoinPulse, dailySparkles]);
+  React.useEffect(() => {
+    if (!claimSuccessOpen) return undefined;
+    claimSuccessPulse.setValue(0);
+    claimSuccessSparkles.setValue(0);
+    const coinLoop = Animated.loop(Animated.sequence([
+      Animated.timing(claimSuccessPulse, {toValue: 1, duration: 680, useNativeDriver: true}),
+      Animated.timing(claimSuccessPulse, {toValue: 0, duration: 680, useNativeDriver: true}),
+    ]));
+    const sparkleLoop = Animated.loop(Animated.timing(claimSuccessSparkles, {toValue: 1, duration: 1200, useNativeDriver: true}));
+    coinLoop.start(); sparkleLoop.start();
+    return () => { coinLoop.stop(); sparkleLoop.stop(); claimSuccessPulse.stopAnimation(); claimSuccessSparkles.stopAnimation(); };
+  }, [claimSuccessOpen, claimSuccessPulse, claimSuccessSparkles]);
   React.useEffect(() => {
     getMyProfile().then(setProfile).catch(() => { });
   }, []);
@@ -343,11 +376,41 @@ export default function HomeScreen({ navigation }) {
   };
   const matchingPeople = people.filter(person => matchesGenderPreference(person) && matchesLanguagePreference(person));
   const visiblePeople = filter === 'Online' ? matchingPeople.filter(person => person.isOnline === true) : matchingPeople;
+  const nearbyPeople = matchingPeople.slice(0, nearbyRevealCount);
+  const nearbyCity = profile?.city || profile?.location?.city || 'Your city';
+  React.useEffect(() => {
+    if (filter !== 'Nearby') { setNearbyRevealCount(0); return undefined; }
+    setNearbyRevealCount(0);
+    let reveal;
+    const firstProfileTimer = setTimeout(() => setNearbyRevealCount(current => Math.min(Math.max(current, 1), matchingPeople.length)), 25000);
+    const additionalProfilesTimer = setTimeout(() => {
+      reveal = setInterval(() => setNearbyRevealCount(current => {
+        const next = Math.min(current + 1, matchingPeople.length);
+        if (next >= matchingPeople.length) clearInterval(reveal);
+        return next;
+      }), 5000);
+    }, 30000);
+    return () => { clearTimeout(firstProfileTimer); clearTimeout(additionalProfilesTimer); clearInterval(reveal); };
+  }, [filter, matchingPeople.length]);
+  React.useEffect(() => {
+    if (filter !== 'Nearby') return undefined;
+    nearbyWave.setValue(0);
+    const waveLoop = Animated.loop(Animated.timing(nearbyWave, {toValue: 1, duration: 2600, useNativeDriver: true}));
+    waveLoop.start();
+    return () => { waveLoop.stop(); nearbyWave.stopAnimation(); };
+  }, [filter, nearbyWave]);
   const connectProfiles = [
     ...matchingPeople.filter(person => person.isOnline === true),
     ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo').filter(person => matchesGenderPreference(person) && matchesLanguagePreference(person)),
   ];  const joinCall = person => {
     navigation.navigate('AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
+  };
+  const openClaimAction = type => {
+    setClaimSuccessOpen(false);
+    const person = connectProfiles[0];
+    if (type === 'chat') return navigation.navigate('Chats');
+    if (!person) return preview('MILO Connect');
+    navigation.navigate(type === 'video' ? 'VideoRoom' : 'AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true), callType: type});
   };
   const connectRooms = [...connectProfiles, { _id: 'see-more-rooms', type: 'seeMore' }];
   const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);
@@ -426,7 +489,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.reward}>
+        {filter !== 'Nearby' && <View style={styles.reward}>
 <Gradient from="#341763" to="#090A1B" radius={24} />
           <View style={styles.rewardTopGlow} />
           <View style={styles.rewardDiagonalGlow} />
@@ -436,7 +499,7 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.rewardAmount}><Text style={styles.rewardAmountText}>70 <Text style={styles.rewardAmountLabel}>coins</Text></Text><Text style={[styles.rewardState, secondsLeft === 0 && styles.rewardReady]}>{secondsLeft > 0 ? 'claimed' : 'ready to claim'}</Text></View>
           </View>
           <View style={styles.rewardTimer}><Clock3 size={23} color="#BEB0E7" /><Text style={styles.rewardTimerLabel}>{secondsLeft > 0 ? 'Next reward in' : 'Daily reward ready'}</Text>{secondsLeft > 0 && <Text style={styles.rewardTimerValue}>{rewardHours}h {rewardMinutes}m {rewardSeconds}s</Text>}</View>
-        </View>        <View style={styles.filters}>
+        </View>}<View style={styles.filters}>
           {FILTERS.map(({ label, icon: Icon }) => (
             <Pressable
               key={label}
@@ -464,28 +527,21 @@ export default function HomeScreen({ navigation }) {
           ))}
         </View>
 
-        <SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
-        <FlatList
-          horizontal
-          data={connectRooms}
-          keyExtractor={item => item._id}
-          renderItem={({ item }) => item.type === 'seeMore' ? <SeeMoreRoomsCard cardWidth={connectCardWidth} onPress={() => preview('More rooms')} /> : <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={joinCall} />}
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          snapToInterval={connectCardWidth + 10}
-          snapToAlignment="start"
-          contentContainerStyle={styles.connectList}
-        />
-        <SectionTitle
-          title="MILO Chat"
-          subtitle="Start a chat before you call."
-          isNew
-          onPress={() => preview('More chats')}
-        />
-        <View style={styles.miloChatRow}>
-          {visiblePeople.slice(0, 3).map(person => <MiloChatCard key={person._id || person.firebaseUid} person={person} cardWidth={miloChatCardWidth} onPress={selectedPerson => navigation.navigate('ChatConversation', { person: selectedPerson })} />)}
-        </View>
-        {!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>{filter === 'Online' ? 'No registered members are online yet.' : 'Registered members will appear here.'}</Text>}
+        {filter === 'Online' ? <><View style={styles.onlineSectionHeader}><View><Text style={styles.onlineSectionTitle}>MILO Connect</Text><Text style={styles.onlineSectionSubtitle}>People online right now</Text></View><View style={styles.onlineCount}><Text style={styles.onlineCountText}>{visiblePeople.length} people online</Text><View style={styles.onlineCountDot} /></View></View><View style={styles.onlineProfileList}>{visiblePeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>No registered members are online yet.</Text>}</> : filter === 'Nearby' ? <><View style={styles.nearbyHeader}><View><Text style={styles.nearbyTitle}>Nearby</Text><Text style={styles.nearbySubtitle}>Find people in {nearbyCity}</Text></View><View style={styles.cityPill}><MapPin size={13} color="#E5CBFF" /><Text style={styles.cityPillText}>{nearbyCity}</Text><ChevronRight size={13} color="#E5CBFF" /></View></View><NearbyRadar profile={profile} people={nearbyPeople.slice(0, 7)} city={nearbyCity} wave={nearbyWave} /><View style={styles.nearbyCountCard}><View style={styles.nearbyCountIcon}><UserRound size={18} color="#BC76FF" /></View><View><Text style={styles.nearbyCountTitle}>{nearbyPeople.length} people nearby</Text><Text style={styles.nearbyCountSubtitle}>in {nearbyCity}</Text></View><ChevronRight size={18} color="#B96DFF" /></View><Text style={styles.peopleNearbyTitle}>People Nearby</Text><View style={styles.onlineProfileList}>{nearbyPeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !matchingPeople.length && <Text style={styles.miloChatEmpty}>No nearby members are available yet.</Text>}</> : <><SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
+          <FlatList
+            horizontal
+            data={connectRooms}
+            keyExtractor={item => item._id}
+            renderItem={({ item }) => item.type === 'seeMore' ? <SeeMoreRoomsCard cardWidth={connectCardWidth} onPress={() => preview('More rooms')} /> : <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={joinCall} />}
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={connectCardWidth + 10}
+            snapToAlignment="start"
+            contentContainerStyle={styles.connectList}
+          />
+          <SectionTitle title="MILO Chat" subtitle="Start a chat before you call." isNew onPress={() => preview('More chats')} />
+          <View style={styles.miloChatRow}>{visiblePeople.slice(0, 3).map(person => <MiloChatCard key={person._id || person.firebaseUid} person={person} cardWidth={miloChatCardWidth} onPress={selectedPerson => navigation.navigate('ChatConversation', { person: selectedPerson })} />)}</View>
+          {!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>Registered members will appear here.</Text>}</>}
         <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
           <Gradient from="#3D255F" to="#8D39E8" radius={15} />
           <Image source={require('../../../assets/icons/crown.png')} style={styles.crown} resizeMode="contain" />
@@ -495,6 +551,27 @@ export default function HomeScreen({ navigation }) {
       </ScrollView>
       <WelcomeRewardModal reward={welcomeReward} onClose={() => setWelcomeReward(null)} />
 <Modal transparent animationType="slide" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={() => setDailyClaimOpen(false)}><View style={styles.dailySheetOverlay}><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailySheetBackdrop} /><View style={styles.dailySheet}><View style={styles.dailySheetBackground} /><View style={styles.dailySheetGlow} /><View style={styles.sheetHandle} /><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailyClaimClose}><X size={20} color="#F5EEFF" /></Pressable><View style={styles.dailyCoinStage}><Animated.Text style={[styles.claimSparkle, styles.claimSparkleLeft, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.3, 1, 0.3]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['0deg', '45deg']})}]}]}>✦</Animated.Text><Animated.View style={{transform: [{scale: dailyCoinPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.08]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /></Animated.View><Animated.Text style={[styles.claimSparkle, styles.claimSparkleRight, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.25, 1]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [-7, 8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['45deg', '0deg']})}]}]}>✦</Animated.Text></View><Text style={styles.dailyClaimTitle}>{dailyClaimed ? 'Coins claimed!' : 'Daily coins are ready!'}</Text><Text style={styles.dailyClaimBody}>{dailyClaimed ? '70 coins were added to your wallet.' : 'Claim your 70 free coins for today.'}</Text><Pressable disabled={claimingCoins || dailyClaimed} onPress={claimDailyReward} style={[styles.dailyClaimButton, dailyClaimed && styles.dailyClaimedButton]}><Gradient from="#C05BFF" to="#7025F0" radius={23} /><Coin size={25} /><Text style={styles.dailyClaimButtonText}>{dailyClaimed ? 'Claimed' : claimingCoins ? 'Claiming...' : 'Claim 70 coins'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable></View></View></Modal>
+      <Modal transparent animationType="slide" visible={claimSuccessOpen} statusBarTranslucent onRequestClose={() => setClaimSuccessOpen(false)}>
+        <View style={styles.claimSuccessOverlay}>
+          <Pressable accessibilityLabel="Close reward options" onPress={() => setClaimSuccessOpen(false)} style={styles.claimSuccessBackdrop} />
+          <View style={styles.claimSuccessSheet}>
+            <View style={styles.claimSuccessHandle} />
+            <View style={styles.claimSuccessCoinStage}>
+              <Animated.Text style={[styles.claimSuccessSparkle, styles.claimSuccessSparkleOne, {opacity: claimSuccessSparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.35, 1, 0.35]}), transform: [{translateY: claimSuccessSparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}]}]}>✦</Animated.Text>
+              <Animated.View style={{transform: [{scale: claimSuccessPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.07]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.claimSuccessCoin} resizeMode="contain" /></Animated.View>
+              <Animated.Text style={[styles.claimSuccessSparkle, styles.claimSuccessSparkleTwo, {opacity: claimSuccessSparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.3, 1]}), transform: [{translateY: claimSuccessSparkles.interpolate({inputRange: [0, 1], outputRange: [-8, 7]})}]}]}>✦</Animated.Text>
+            </View>
+            <Text style={styles.claimSuccessTitle}>Nice, you got <Text style={styles.claimSuccessAmount}>70 coins!</Text></Text>
+            <Text style={styles.claimSuccessSubtitle}>Want to try a quick call?</Text>
+            <View style={styles.claimActionRow}>
+              <Pressable onPress={() => openClaimAction('audio')} style={[styles.claimActionCard, styles.audioAction]}><Phone size={27} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.claimActionTitle}>Audio Call</Text><View style={styles.claimActionPrice}><Image source={require('../../../assets/icons/coin.png')} style={styles.claimActionCoin} /><Text style={styles.claimActionPriceText}>15 /min</Text></View></Pressable>
+              <Pressable onPress={() => openClaimAction('video')} style={[styles.claimActionCard, styles.videoAction]}><Video size={27} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.claimActionTitle}>Video Call</Text><View style={styles.claimActionPrice}><Image source={require('../../../assets/icons/coin.png')} style={styles.claimActionCoin} /><Text style={styles.claimActionPriceText}>60 /min</Text></View></Pressable>
+              <Pressable onPress={() => openClaimAction('chat')} style={[styles.claimActionCard, styles.chatAction]}><MessageCircle size={29} color="#FFFFFF" fill="#FFFFFF" /><Text style={styles.claimActionTitle}>Chat</Text><View style={styles.claimActionPrice}><Image source={require('../../../assets/icons/coin.png')} style={styles.claimActionCoin} /><Text style={styles.claimActionPriceText}>10 /4 msgs</Text></View></Pressable>
+            </View>
+            <Pressable onPress={() => setClaimSuccessOpen(false)} style={styles.claimLaterButton}><Text style={styles.claimLaterIcon}>🚀</Text><Text style={styles.claimLaterText}>I will try later, continue to app</Text><ChevronRight size={20} color="#00D9FF" /></Pressable>
+          </View>
+        </View>
+      </Modal>
       <View style={styles.bottomBar}>
         {TABS.map(({ label, icon: Icon }) => (
           <Pressable
@@ -615,6 +692,30 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
   dailyClaimButton: {height: 55, width: '100%', marginTop: 28, borderRadius: 27, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8},
   dailyClaimedButton: {opacity: 0.72},
   dailyClaimButtonText: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 15},
+  claimSuccessOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2, 3, 12, 0.72)'},
+  claimSuccessBackdrop: {position: 'absolute', top: 0, right: 0, bottom: 0, left: 0},
+  claimSuccessSheet: {backgroundColor: '#0D1117', borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1.5, borderBottomWidth: 0, borderColor: '#6133FF', paddingHorizontal: 18, paddingTop: 9, paddingBottom: 27, alignItems: 'center'},
+  claimSuccessHandle: {width: 42, height: 6, borderRadius: 3, backgroundColor: '#7E47FF', marginBottom: 5},
+  claimSuccessCoinStage: {height: 100, width: 170, alignItems: 'center', justifyContent: 'center'},
+  claimSuccessCoin: {width: 96, height: 96},
+  claimSuccessSparkle: {position: 'absolute', color: '#57E6FF', fontSize: 30, fontFamily: 'Poppins-Bold'},
+  claimSuccessSparkleOne: {left: 13, top: 29, color: '#7E47FF'},
+  claimSuccessSparkleTwo: {right: 12, top: 21},
+  claimSuccessTitle: {fontFamily: 'Poppins-Bold', color: '#FFFFFF', fontSize: 24, textAlign: 'center', lineHeight: 30},
+  claimSuccessAmount: {color: '#10D9F5'},
+  claimSuccessSubtitle: {fontFamily: 'Poppins-Medium', color: '#C4B3F5', fontSize: 15, marginTop: 4, marginBottom: 16},
+  claimActionRow: {flexDirection: 'row', width: '100%', gap: 8},
+  claimActionCard: {height: 134, flex: 1, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', gap: 7},
+  audioAction: {backgroundColor: '#063A52', borderColor: '#05D7E9'},
+  videoAction: {backgroundColor: '#202C92', borderColor: '#5367FF'},
+  chatAction: {backgroundColor: '#351276', borderColor: '#8C32F7'},
+  claimActionTitle: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 13},
+  claimActionPrice: {height: 25, minWidth: 77, borderRadius: 13, paddingHorizontal: 7, backgroundColor: 'rgba(3, 8, 29, 0.68)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3},
+  claimActionCoin: {width: 15, height: 15},
+  claimActionPriceText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 9},
+  claimLaterButton: {height: 48, width: '100%', marginTop: 17, borderRadius: 24, borderWidth: 1, borderColor: '#4E32EE', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11},
+  claimLaterIcon: {fontSize: 19},
+  claimLaterText: {fontFamily: 'Poppins-Medium', color: '#C7B9F3', fontSize: 11},
   rewardTopGlow: {position: 'absolute', top: -82, left: -54, right: -35, height: 151, borderBottomLeftRadius: 210, borderBottomRightRadius: 210, backgroundColor: 'rgba(129, 67, 201, 0.15)', transform: [{rotate: '-6deg'}]},
   rewardDiagonalGlow: {position: 'absolute', top: 16, right: -88, width: 316, height: 92, borderRadius: 90, backgroundColor: 'rgba(57, 29, 119, 0.34)', transform: [{rotate: '-17deg'}]},
   rewardHeader: { height: 26, flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -669,6 +770,50 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
   seeAll: { flexDirection: 'row', alignItems: 'center' },
   seeAllText: { fontSize: 10, color: '#B37AFF' },
   connectList: { paddingRight: 14, gap: 10 },
+  onlineSectionHeader: {marginTop: 18, marginBottom: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  onlineSectionTitle: {fontFamily: 'Poppins-SemiBold', color: '#F1E9FB', fontSize: 17},
+  onlineSectionSubtitle: {fontFamily: 'Poppins-Regular', color: '#9C96AE', fontSize: 9, marginTop: -2},
+  onlineCount: {flexDirection: 'row', alignItems: 'center', gap: 4},
+  onlineCountText: {fontFamily: 'Poppins-Regular', color: '#B9B2CA', fontSize: 8},
+  onlineCountDot: {width: 6, height: 6, borderRadius: 3, backgroundColor: '#1DE994'},
+  onlineProfileList: {gap: 7},
+  onlineProfileRow: {height: 64, borderRadius: 12, borderWidth: 1, borderColor: '#26304A', backgroundColor: '#0D111D', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9},
+  onlineProfileAvatar: {width: 47, height: 47, borderRadius: 24, overflow: 'visible'},
+  onlineProfileDot: {position: 'absolute', right: -1, bottom: -1, width: 10, height: 10, borderRadius: 5, backgroundColor: '#1DE994', borderWidth: 1.5, borderColor: '#0D111D'},
+  onlineProfileCopy: {flex: 1, minWidth: 0, marginLeft: 9, justifyContent: 'center'},
+  onlineProfileStatus: {flexDirection: 'row', alignItems: 'center', gap: 4, height: 11},
+  onlineProfileStatusDot: {width: 5, height: 5, borderRadius: 3, backgroundColor: '#1DE994'},
+  onlineProfileStatusText: {fontFamily: 'Poppins-Regular', color: '#50E8A0', fontSize: 7},
+  onlineProfileName: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 11, marginTop: -1},
+  onlineProfileLanguage: {alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, backgroundColor: '#221444', marginTop: 2},
+  onlineProfileLanguageText: {fontFamily: 'Poppins-Medium', color: '#CFA7FF', fontSize: 7},
+  onlineProfileCall: {height: 29, minWidth: 85, borderRadius: 15, backgroundColor: '#8538F2', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginRight: 4},
+  onlineProfileCallText: {fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 9},
+  onlineProfileMore: {position: 'absolute', top: 8, right: 8},
+  nearbyHeader: {marginTop: 17, marginBottom: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  nearbyTitle: {fontFamily: 'Poppins-SemiBold', color: '#F5ECFF', fontSize: 19},
+  nearbySubtitle: {fontFamily: 'Poppins-Regular', color: '#AAA2B9', fontSize: 9, marginTop: -3},
+  cityPill: {height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#543F7B', backgroundColor: '#17132A', paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 4},
+  cityPillText: {fontFamily: 'Poppins-Medium', color: '#EEE4F9', fontSize: 9},
+  nearbyRadar: {height: 340, marginTop: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'},
+  radarRing: {position: 'absolute', borderWidth: 1, borderColor: '#6237EE', borderRadius: 200},
+  radarRingOuter: {width: 305, height: 305, borderColor: '#8B34F2'},
+  radarRingMiddle: {width: 224, height: 224, borderColor: '#4F3EDB'},
+  radarRingInner: {width: 134, height: 134, borderColor: '#3354CF'},
+  radarGlow: {position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(130, 52, 255, 0.3)', shadowColor: '#A344FF', shadowOpacity: 0.9, shadowRadius: 30, shadowOffset: {width: 0, height: 0}},
+  radarCenter: {width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: '#B864FF', overflow: 'visible'},
+  radarCenterDot: {position: 'absolute', right: -2, bottom: -2, width: 12, height: 12, borderRadius: 6, backgroundColor: '#1DE994', borderWidth: 2, borderColor: '#211044'},
+  radarYou: {position: 'absolute', top: 76, alignSelf: 'center', color: '#FFFFFF', fontFamily: 'Poppins-SemiBold', fontSize: 10},
+  radarCity: {position: 'absolute', top: 89, alignSelf: 'center', color: '#B3A6C9', fontSize: 8},
+  radarPerson: {position: 'absolute', alignItems: 'center'},
+  radarPersonAvatar: {width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: '#A455F2', overflow: 'visible'},
+  radarPersonDot: {position: 'absolute', right: -2, bottom: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: '#1DE994', borderWidth: 1, borderColor: '#100D21'},
+  radarDistance: {fontFamily: 'Poppins-Medium', color: '#E4DCED', fontSize: 8, marginTop: 3},
+  nearbyCountCard: {height: 60, marginHorizontal: 8, borderRadius: 18, borderWidth: 1, borderColor: '#3D2684', backgroundColor: '#15123C', paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10},
+  nearbyCountIcon: {width: 35, height: 35, borderRadius: 18, backgroundColor: '#261753', alignItems: 'center', justifyContent: 'center'},
+  nearbyCountTitle: {fontFamily: 'Poppins-Medium', color: '#F1EAFE', fontSize: 12},
+  nearbyCountSubtitle: {fontFamily: 'Poppins-Regular', color: '#ACA0C1', fontSize: 9, marginTop: -2},
+  peopleNearbyTitle: {fontFamily: 'Poppins-SemiBold', color: '#EEE7F8', fontSize: 15, marginTop: 18, marginBottom: 9},
   connectCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', padding: 8 },
   seeMoreRoomsCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', padding: 18, justifyContent: 'center', alignItems: 'center' },
   seeMoreRoomsIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(180, 96, 255, 0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
