@@ -463,19 +463,19 @@ export default function HomeScreen({ navigation }) {
             <View><Text numberOfLines={1} style={styles.headerName}>{profile?.nickname || 'My Profile'}</Text><Text style={styles.tagline}>View profile</Text></View>
           </Pressable>
           <View style={styles.headerActions}>
-            <View style={styles.wallet}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Buy coins" onPress={() => navigation.navigate('CoinStore')} style={styles.wallet}>
               <Coin size={21} />
               <Text style={styles.balance}>{profile?.coinBalance ?? 0}</Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Add coins"
-                onPress={() => preview('Coin store')}
+                onPress={() => navigation.navigate('CoinStore')}
                 style={styles.plus}
               >
                 <Gradient from="#733DCF" to="#291A54" radius={8} />
                 <Plus size={16} color="#F6DFFF" />
               </Pressable>
-            </View>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Notifications"

@@ -1,0 +1,40 @@
+import React, { useEffect, useState } from 'react';
+import { Image, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ArrowLeft, Check, ChevronRight, Gift, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { getMyProfile } from '../../services/userService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const packages = [
+  { coins: 70, oldPrice: '₹49', price: '₹29' },
+  { coins: 190, oldPrice: '₹99', price: '₹59' },
+  { coins: 520, oldPrice: '₹199', price: '₹119' },
+  { coins: 1100, oldPrice: '₹399', price: '₹239' },
+  { coins: 2600, oldPrice: '₹799', price: '₹479' },
+  { coins: 5600, oldPrice: '₹1599', price: '₹959' },
+];
+
+export default function CoinStoreScreen({ navigation }) {
+  const [profile, setProfile] = useState(null);
+  const [coupon, setCoupon] = useState('');
+  useEffect(() => { getMyProfile().then(setProfile).catch(() => { }); }, []);
+  return <SafeAreaView style={styles.screen} edges={['top', 'bottom', 'left', 'right']}>
+    <StatusBar barStyle="light-content" backgroundColor="#080910" />
+    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}><Pressable onPress={() => navigation.goBack()} style={styles.back}><ArrowLeft size={22} color="#F5EEFF" /></Pressable><Text style={styles.headerTitle}>Buy Coins</Text><View style={styles.wallet}><Image source={require('../../../assets/icons/coin.png')} style={styles.walletCoin} /><Text style={styles.walletText}>{profile?.coinBalance ?? 0}</Text><View style={styles.walletPlus}>+</View></View></View>
+      <View style={styles.hero}><View style={styles.heroOrb} /><Text style={styles.milo}>milo</Text><Text style={styles.heroTitle}>Get More Coins</Text><Text style={styles.heroSubtitle}>Unlock more fun, calls & chats!</Text><View style={styles.heroFeatures}><Text style={styles.heroFeature}>⌕  Calls</Text><Text style={styles.heroFeature}>▣  Chat</Text><Text style={styles.heroFeature}>✦  Gifts</Text><Text style={styles.heroFeature}>✦  Special Features</Text></View><Image source={require('../../../assets/images/coin.png')} style={styles.heroCoin} resizeMode="contain" /><Sparkles size={20} color="#FFE65E" style={styles.heroSparkle} /></View>
+      <View style={styles.coupon}><View style={styles.couponRow}><View style={styles.couponIcon}>%</View><TextInput value={coupon} onChangeText={setCoupon} placeholder="Enter Coupon Code" placeholderTextColor="#9C91B4" style={styles.couponInput} /><Pressable onPress={() => { }} style={styles.apply}><Text style={styles.applyText}>Apply</Text></Pressable></View><Pressable style={styles.couponLink}><Gift size={13} color="#A460FF" /><Text style={styles.couponLinkText}>View all coupons</Text><ChevronRight size={13} color="#A460FF" /></Pressable></View>
+      <View style={styles.packageHeader}><Text style={styles.packageTitle}>Coin Packages</Text><View style={styles.secure}><ShieldCheck size={12} color="#A469FF" /><Text style={styles.secureText}>100% Secure Payment</Text></View></View>
+      <View style={styles.grid}>{packages.map(item => <Pressable key={item.coins} style={styles.packageCard}><View style={styles.discount}><Text style={styles.discountText}>40%{`\n`}OFF</Text></View><View style={styles.packageCheck}><Check size={10} color="#FFFFFF" strokeWidth={3} /></View><View style={styles.coinStack}><Image source={require('../../../assets/icons/coin.png')} style={styles.stackCoin} /><Image source={require('../../../assets/icons/coin.png')} style={[styles.stackCoin, styles.stackCoinTop]} /></View><Text style={styles.packageCoins}>{item.coins} Coins</Text><View style={styles.priceLine}><Text style={styles.oldPrice}>{item.oldPrice}</Text><Text style={styles.price}>{item.price}</Text></View></Pressable>)}</View>
+    </ScrollView>
+  </SafeAreaView>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#080910' }, content: { paddingHorizontal: 10, paddingBottom: 28 },
+  header: { height: 48, flexDirection: 'row', alignItems: 'center' }, back: { width: 32, alignItems: 'flex-start' }, headerTitle: { flex: 1, fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 16 },
+  wallet: { height: 30, borderRadius: 15, paddingLeft: 5, paddingRight: 4, backgroundColor: '#19142E', borderWidth: 1, borderColor: '#4E3D74', flexDirection: 'row', alignItems: 'center', gap: 4 }, walletCoin: { width: 19, height: 19 }, walletText: { fontFamily: 'Poppins-SemiBold', color: '#FFE16A', fontSize: 11 }, walletPlus: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#7338C7', color: '#FFFFFF', textAlign: 'center', fontSize: 18, lineHeight: 19 },
+  hero: { height: 105, borderRadius: 16, overflow: 'hidden', backgroundColor: '#2A0B6A', padding: 13 }, heroOrb: { position: 'absolute', right: -55, top: -65, width: 230, height: 180, borderRadius: 115, backgroundColor: 'rgba(123, 55, 255, 0.45)' }, milo: { fontFamily: 'Poppins-Bold', color: '#F1E7FF', fontSize: 22, lineHeight: 20 }, heroTitle: { fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 16, marginTop: 1 }, heroSubtitle: { fontFamily: 'Poppins-Regular', color: '#D7C5EF', fontSize: 9, marginTop: -2 }, heroFeatures: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10, maxWidth: '62%' }, heroFeature: { fontFamily: 'Poppins-Medium', color: '#F4E5FF', fontSize: 7 }, heroCoin: { position: 'absolute', right: 17, bottom: 8, width: 80, height: 80 }, heroSparkle: { position: 'absolute', right: 16, top: 15 },
+  coupon: { marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: '#25215E', backgroundColor: '#0F1130', padding: 7 }, couponRow: { height: 32, borderRadius: 10, borderWidth: 1, borderColor: '#4A3A86', flexDirection: 'row', alignItems: 'center', paddingLeft: 5 }, couponIcon: { width: 21, height: 21, borderRadius: 7, backgroundColor: '#6639D6', color: '#FFFFFF', fontFamily: 'Poppins-Bold', fontSize: 14, textAlign: 'center', lineHeight: 21 }, couponInput: { flex: 1, color: '#FFFFFF', fontSize: 9, paddingHorizontal: 8, paddingVertical: 0 }, apply: { height: 24, minWidth: 68, borderRadius: 12, backgroundColor: '#7D38F2', alignItems: 'center', justifyContent: 'center', marginRight: 4 }, applyText: { fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 9 }, couponLink: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 }, couponLinkText: { fontFamily: 'Poppins-Regular', color: '#AFA4CA', fontSize: 8 },
+  packageHeader: { marginTop: 12, marginBottom: 7, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, packageTitle: { fontFamily: 'Poppins-SemiBold', color: '#F7F1FF', fontSize: 13 }, secure: { flexDirection: 'row', alignItems: 'center', gap: 3 }, secureText: { color: '#AFA5C4', fontSize: 7 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, packageCard: { width: '31.7%', height: 89, borderRadius: 11, borderWidth: 1, borderColor: '#5130A7', backgroundColor: '#111230', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, discount: { position: 'absolute', top: 4, left: 4, width: 23, height: 23, borderRadius: 11, backgroundColor: '#E83FDD', alignItems: 'center', justifyContent: 'center' }, discountText: { fontFamily: 'Poppins-Bold', color: '#FFFFFF', fontSize: 6, lineHeight: 7, textAlign: 'center' }, packageCheck: { position: 'absolute', top: 5, right: 5, width: 14, height: 14, borderRadius: 7, backgroundColor: '#8944ED', alignItems: 'center', justifyContent: 'center' }, coinStack: { height: 33, width: 49, alignItems: 'center', justifyContent: 'flex-end' }, stackCoin: { width: 32, height: 32, position: 'absolute', left: 6, bottom: 0 }, stackCoinTop: { left: 18, bottom: 4 }, packageCoins: { fontFamily: 'Poppins-SemiBold', color: '#F7F1FF', fontSize: 9, marginTop: 1 }, priceLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }, oldPrice: { color: '#9B92AF', textDecorationLine: 'line-through', fontSize: 8 }, price: { fontFamily: 'Poppins-Bold', color: '#F1A7FF', fontSize: 10 },
+});

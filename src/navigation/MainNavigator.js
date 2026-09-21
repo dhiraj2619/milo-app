@@ -4,6 +4,7 @@ import ProfileScreen from '../screens/profile/ProfileScreen';
 import ChatsScreen from '../screens/chat/ChatsScreen';
 import ChatConversationScreen from '../screens/chat/ChatConversationScreen';
 import AudioRoomScreen from '../screens/call/AudioRoomScreen';
+import CoinStoreScreen from '../screens/coin/CoinStoreScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -16,6 +17,7 @@ const MainNavigator = () => {
       <Stack.Screen name="ChatConversation" component={ChatConversationScreen} />
       <Stack.Screen name="AudioRoom" component={AudioRoomScreen} />
       <Stack.Screen name="VideoRoom" component={AudioRoomScreen} />
+      <Stack.Screen name="CoinStore" component={CoinStoreScreen} />
     </Stack.Navigator>
   );
 };
