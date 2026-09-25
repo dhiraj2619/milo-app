@@ -69,8 +69,11 @@ export async function verifyPhoneOTP(otp, phone) {
     throw new Error(response.data.message || 'Unable to complete sign-in. Please retry.');
   }
   const result = response.data.data;
-  if (result.user?.profileCompleted) {
-    await saveSessionProfile(result.user);
+  const profile = result?.user || result?.profile;
+  // Preserve the registered profile for this Firebase identity even when the
+  // backend uses a different profile-completion flag name.
+  if (profile?.firebaseUid === user.uid && (profile?.nickname || profile?.phone)) {
+    await saveSessionProfile(profile);
   }
   return result;
 }

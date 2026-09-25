@@ -36,7 +36,7 @@ import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 import { claimDailyCoins } from '../../services/coinService';
 import { getConversations } from '../../services/chatService';
-import { consumeWelcomeReward } from '../../services/sessionService';
+import { consumeWelcomeReward, getDailyClaimAt, saveDailyClaimAt } from '../../services/sessionService';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 import { io } from 'socket.io-client';
 import { SERVER_URL } from '../../config/config';
@@ -253,7 +253,10 @@ export default function HomeScreen({ navigation }) {
     setClaimingCoins(true);
     try {
       const wallet = await claimDailyCoins();
-      setProfile(current => ({ ...current, coinBalance: wallet.coinBalance, lastDailyCoinClaimAt: wallet.claimedAt }));
+      const claimedAt = wallet.claimedAt || wallet.lastDailyCoinClaimAt || wallet.dailyClaimedAt || wallet.lastClaimAt || wallet.dailyCoinClaimedAt || new Date().toISOString();
+      const firebaseUid = profile?.firebaseUid || getAuth().currentUser?.uid;
+      await saveDailyClaimAt(firebaseUid, claimedAt);
+      setProfile(current => ({ ...current, coinBalance: wallet.coinBalance ?? current?.coinBalance ?? 0, lastDailyCoinClaimAt: claimedAt }));
       setDailyClaimOpen(false);
       setDailyClaimed(false);
       setClaimSuccessOpen(true);
@@ -289,7 +292,16 @@ export default function HomeScreen({ navigation }) {
     return () => { coinLoop.stop(); sparkleLoop.stop(); claimSuccessPulse.stopAnimation(); claimSuccessSparkles.stopAnimation(); };
   }, [claimSuccessOpen, claimSuccessPulse, claimSuccessSparkles]);
   React.useEffect(() => {
-    getMyProfile().then(setProfile).catch(() => { });
+    let active = true;
+    getMyProfile().then(async loadedProfile => {
+      const savedClaimAt = await getDailyClaimAt(loadedProfile?.firebaseUid || getAuth().currentUser?.uid);
+      const serverClaimAt = loadedProfile?.lastDailyCoinClaimAt || loadedProfile?.claimedAt || loadedProfile?.dailyClaimedAt || loadedProfile?.lastClaimAt || loadedProfile?.dailyCoinClaimedAt;
+      const serverTime = new Date(serverClaimAt || 0).getTime();
+      const savedTime = new Date(savedClaimAt || 0).getTime();
+      const lastDailyCoinClaimAt = savedTime > serverTime ? savedClaimAt : serverClaimAt;
+      if (active) setProfile({...loadedProfile, ...(lastDailyCoinClaimAt ? {lastDailyCoinClaimAt} : {})});
+    }).catch(() => { });
+    return () => { active = false; };
   }, []);
   React.useEffect(() => {
     let mounted = true;
@@ -403,14 +415,14 @@ export default function HomeScreen({ navigation }) {
     ...matchingPeople.filter(person => person.isOnline === true),
     ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo').filter(person => matchesGenderPreference(person) && matchesLanguagePreference(person)),
   ];  const joinCall = person => {
-    navigation.navigate('AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
+    navigation.navigate('AudioRoom', {person, currentUser: profile, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
   };
   const openClaimAction = type => {
     setClaimSuccessOpen(false);
     const person = connectProfiles[0];
     if (type === 'chat') return navigation.navigate('Chats');
     if (!person) return preview('MILO Connect');
-    navigation.navigate(type === 'video' ? 'VideoRoom' : 'AudioRoom', {person, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true), callType: type});
+    navigation.navigate(type === 'video' ? 'VideoRoom' : 'AudioRoom', {person, currentUser: profile, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true), callType: type});
   };
   const connectRooms = [...connectProfiles, { _id: 'see-more-rooms', type: 'seeMore' }];
   const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);

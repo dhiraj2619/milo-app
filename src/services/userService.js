@@ -1,5 +1,6 @@
 import {getAuth, getIdToken} from '@react-native-firebase/auth';
 import api from './api';
+import {getSessionProfile, saveSessionProfile} from './sessionService';
 
 async function token() {
   const user = getAuth().currentUser;
@@ -7,9 +8,34 @@ async function token() {
   return getIdToken(user);
 }
 
+function responseProfile(response) {
+  const data = response?.data?.data;
+  return data?.user || response?.data?.user || data || null;
+}
+
+async function cachedProfileForCurrentUser() {
+  const cached = await getSessionProfile();
+  const currentUser = getAuth().currentUser;
+  if (!cached || !currentUser) return null;
+  return cached.firebaseUid === currentUser.uid ? cached : null;
+}
+
 export async function getMyProfile() {
-  const response = await api.get('/users/me', {headers: {Authorization: `Bearer ${await token()}`}});
-  return response.data.data.user;
+  try {
+    const response = await api.get('/users/me', {headers: {Authorization: `Bearer ${await token()}`}});
+    const profile = responseProfile(response);
+    if (profile?.nickname || profile?.phone || profile?.firebaseUid) {
+      await saveSessionProfile(profile);
+      return profile;
+    }
+    const cached = await cachedProfileForCurrentUser();
+    if (cached) return cached;
+    throw new Error('Your profile was not returned by the server.');
+  } catch (error) {
+    const cached = await cachedProfileForCurrentUser();
+    if (cached) return cached;
+    throw error;
+  }
 }
 
 export async function getDiscoverProfiles({page = 1, limit = 12, language} = {}) {
@@ -22,7 +48,9 @@ export async function getDiscoverProfiles({page = 1, limit = 12, language} = {})
 
 export async function updateMyProfile(profile) {
   const response = await api.patch('/users/me', profile, {headers: {Authorization: `Bearer ${await token()}`}});
-  return response.data.data.user;
+  const updatedProfile = responseProfile(response);
+  if (updatedProfile) await saveSessionProfile(updatedProfile);
+  return updatedProfile;
 }
 
 export async function uploadProfilePhoto(asset) {
@@ -31,5 +59,7 @@ export async function uploadProfilePhoto(asset) {
   const response = await api.post('/users/me/photo', formData, {
     headers: {Authorization: `Bearer ${await token()}`, 'Content-Type': 'multipart/form-data'},
   });
-  return response.data.data.user;
+  const updatedProfile = responseProfile(response);
+  if (updatedProfile) await saveSessionProfile(updatedProfile);
+  return updatedProfile;
 }
