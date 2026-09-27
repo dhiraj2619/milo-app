@@ -11,3 +11,8 @@ export async function claimDailyCoins() {
   const response = await api.post('/coins/daily-claim', {}, {headers: await authorizationHeaders()});
   return response.data.data;
 }
+
+export async function getWallet() {
+  const response = await api.get('/coins/wallet', {headers: await authorizationHeaders()});
+  return response.data.data;
+}

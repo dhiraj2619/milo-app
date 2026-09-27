@@ -34,7 +34,7 @@ import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
-import { claimDailyCoins } from '../../services/coinService';
+import { claimDailyCoins, getWallet } from '../../services/coinService';
 import { getConversations } from '../../services/chatService';
 import { consumeWelcomeReward, getDailyClaimAt, saveDailyClaimAt } from '../../services/sessionService';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
@@ -294,12 +294,15 @@ export default function HomeScreen({ navigation }) {
   React.useEffect(() => {
     let active = true;
     getMyProfile().then(async loadedProfile => {
-      const savedClaimAt = await getDailyClaimAt(loadedProfile?.firebaseUid || getAuth().currentUser?.uid);
-      const serverClaimAt = loadedProfile?.lastDailyCoinClaimAt || loadedProfile?.claimedAt || loadedProfile?.dailyClaimedAt || loadedProfile?.lastClaimAt || loadedProfile?.dailyCoinClaimedAt;
+      const [savedClaimAt, wallet] = await Promise.all([
+        getDailyClaimAt(loadedProfile?.firebaseUid || getAuth().currentUser?.uid),
+        getWallet().catch(() => null),
+      ]);
+      const serverClaimAt = wallet?.lastDailyCoinClaimAt || loadedProfile?.lastDailyCoinClaimAt || loadedProfile?.claimedAt || loadedProfile?.dailyClaimedAt || loadedProfile?.lastClaimAt || loadedProfile?.dailyCoinClaimedAt;
       const serverTime = new Date(serverClaimAt || 0).getTime();
       const savedTime = new Date(savedClaimAt || 0).getTime();
       const lastDailyCoinClaimAt = savedTime > serverTime ? savedClaimAt : serverClaimAt;
-      if (active) setProfile({...loadedProfile, ...(lastDailyCoinClaimAt ? {lastDailyCoinClaimAt} : {})});
+      if (active) setProfile({...loadedProfile, ...(wallet?.coinBalance !== undefined ? {coinBalance: wallet.coinBalance} : {}), ...(lastDailyCoinClaimAt ? {lastDailyCoinClaimAt} : {})});
     }).catch(() => { });
     return () => { active = false; };
   }, []);
