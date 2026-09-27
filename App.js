@@ -16,21 +16,26 @@ const App = () => {
   const handleProfileCompleted = useCallback(() => setSignedIn(true), []);
   useEffect(() => {
     const unsubscribe = getAuth().onAuthStateChanged(async user => {
-      if (!user) {
-        await clearSessionProfile();
-        setSignedIn(false);
-        setSessionReady(true);
-        return;
-      }
-      let profile = await getSessionProfile().catch(() => null);
-      if (!profile?.profileCompleted) {
-        profile = await getMyProfile().catch(() => null);
-        if (profile?.profileCompleted) {
-          await saveSessionProfile(profile);
+      try {
+        if (!user) {
+          await clearSessionProfile();
+          setSignedIn(false);
+          return;
         }
+        let profile = await getSessionProfile().catch(() => null);
+        if (!profile?.profileCompleted) {
+          profile = await getMyProfile().catch(() => null);
+          if (profile?.profileCompleted) {
+            await saveSessionProfile(profile);
+          }
+        }
+        setSignedIn(profile?.profileCompleted === true);
+      } catch (error) {
+        console.warn('Session initialization failed:', error?.message || error);
+        setSignedIn(false);
+      } finally {
+        setSessionReady(true);
       }
-      setSignedIn(profile?.profileCompleted === true);
-      setSessionReady(true);
     });
     return unsubscribe;
   }, []);

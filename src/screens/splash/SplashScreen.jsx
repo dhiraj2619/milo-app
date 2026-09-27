@@ -30,12 +30,12 @@ const SplashScreen = ({onFinish}) => {
       animations.forEach(animation => animation.start());
     };
     AccessibilityInfo.isReduceMotionEnabled().then(setMotion).catch(() => {});
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setMotion);
-    const timer = setTimeout(onFinish, 3400);
+    const subscription = AccessibilityInfo.addEventListener?.('reduceMotionChanged', setMotion);
+    const timer = setTimeout(() => onFinish?.(), 3400);
     return () => {
       disposed = true;
       clearTimeout(timer);
-      subscription.remove();
+      subscription?.remove?.();
       animations.forEach(animation => animation.stop());
     };
   }, [drift, heartbeat, onFinish]);

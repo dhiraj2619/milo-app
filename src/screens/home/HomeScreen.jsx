@@ -411,10 +411,9 @@ export default function HomeScreen({ navigation }) {
     waveLoop.start();
     return () => { waveLoop.stop(); nearbyWave.stopAnimation(); };
   }, [filter, nearbyWave]);
-  const connectProfiles = [
-    ...matchingPeople.filter(person => person.isOnline === true),
-    ...selectDemoProfiles(profile?.firebaseUid || profile?.phone || profile?.avatarSeed || 'milo-demo').filter(person => matchesGenderPreference(person) && matchesLanguagePreference(person)),
-  ];  const joinCall = person => {
+  const connectProfiles = matchingPeople.filter(person => person.isOnline === true);
+  const chatProfiles = people.slice(0, 3);
+  const joinCall = person => {
     navigation.navigate('AudioRoom', {person, currentUser: profile, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
   };
   const openClaimAction = type => {
@@ -552,8 +551,8 @@ export default function HomeScreen({ navigation }) {
             contentContainerStyle={styles.connectList}
           />
           <SectionTitle title="MILO Chat" subtitle="Start a chat before you call." isNew onPress={() => preview('More chats')} />
-          <View style={styles.miloChatRow}>{visiblePeople.slice(0, 3).map(person => <MiloChatCard key={person._id || person.firebaseUid} person={person} cardWidth={miloChatCardWidth} onPress={selectedPerson => navigation.navigate('ChatConversation', { person: selectedPerson })} />)}</View>
-          {!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>Registered members will appear here.</Text>}</>}
+          <View style={styles.miloChatRow}>{chatProfiles.map(person => <MiloChatCard key={person._id || person.firebaseUid} person={person} cardWidth={miloChatCardWidth} onPress={selectedPerson => navigation.navigate('ChatConversation', { person: selectedPerson })} />)}</View>
+          {!loadingPeople && !chatProfiles.length && <Text style={styles.miloChatEmpty}>Registered members will appear here.</Text>}</>}
         <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
           <Gradient from="#3D255F" to="#8D39E8" radius={15} />
           <Image source={require('../../../assets/icons/crown.png')} style={styles.crown} resizeMode="contain" />
