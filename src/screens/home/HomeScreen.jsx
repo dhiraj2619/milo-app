@@ -142,6 +142,24 @@ const TABS = [
 
 const LANGUAGE_LABELS = { Hindi: 'हिंदी', Marathi: 'मराठी', Bengali: 'বাংলা', Tamil: 'தமிழ்', Telugu: 'తెలుగు', Gujarati: 'ગુજરાતી', Kannada: 'ಕನ್ನಡ', English: 'English' };
 const languageLabel = language => LANGUAGE_LABELS[language] || language;
+function hasActiveMiloConnect(profile) {
+  if (!profile) return false;
+  if (profile.hasMiloConnect === true || profile.miloConnectActive === true) return true;
+  const subscription = profile.activeSubscription || profile.subscription || profile.currentSubscription || profile.plan || {};
+  const plan = subscription.plan || subscription.subscriptionPlan || subscription;
+  const planIdentity = [profile.subscriptionPlanCode, profile.planCode, profile.subscriptionPlan, plan.code, plan.planCode, plan.name, plan.title]
+    .filter(value => typeof value === 'string').join(' ').toLowerCase();
+  const isMiloConnect = planIdentity.includes('milo connect') || planIdentity.includes('milo_connect') || planIdentity.includes('milo-connect');
+  if (!isMiloConnect) return false;
+  const status = String(subscription.status || plan.status || profile.subscriptionStatus || 'active').toLowerCase();
+  if (!['active', 'trial', 'paid'].includes(status)) return false;
+  const expiry = subscription.expiresAt || subscription.endDate || plan.expiresAt || profile.subscriptionExpiresAt;
+  return !expiry || new Date(expiry).getTime() > Date.now();
+}
+
+function NearbyUpgrade({onUpgrade}) {
+  return <View style={styles.nearbyUpgrade}><MapPin size={31} color="#C286FF" /><Text style={styles.nearbyUpgradeTitle}>Nearby is a MILO Connect feature</Text><Text style={styles.nearbyUpgradeText}>Upgrade to discover people in your city.</Text><Pressable accessibilityRole="button" onPress={onUpgrade} style={styles.nearbyUpgradeButton}><Text style={styles.nearbyUpgradeButtonText}>Upgrade</Text><ChevronRight size={18} color="#FFFFFF" /></Pressable></View>;
+}
 function ConnectProfileCard({ person, cardWidth, onPress }) {
   const isOffline = person.isOnline !== true;
   return <View style={[styles.connectCard, { width: cardWidth }]}>
@@ -183,7 +201,7 @@ function MiloChatCard({ person, cardWidth, onPress }) {
     <View style={styles.miloChatAvatar}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /><View style={[styles.profilePresenceDot, isOffline && styles.offlineDot]} /></View>
     <Text numberOfLines={1} style={styles.miloChatName}>{name} {person.age || ''}</Text>
     <Text numberOfLines={1} style={styles.miloChatLanguage}>{languageLabel(person.languages?.[0] || 'English')}</Text>
-    <View style={styles.miloChatButton}><Image source={require('../../../assets/icons/message.png')} style={styles.miloChatButtonIcon} resizeMode="contain" /><Text style={styles.miloChatButtonText}>Chat</Text></View>
+    <View style={styles.miloChatButton}><MessageCircle size={15} color="#B863FF" /><Text style={styles.miloChatButtonText}>Chat</Text></View>
   </Pressable>;
 } function WelcomeRewardModal({ reward, onClose }) {
   if (!reward) return null;
@@ -393,6 +411,7 @@ export default function HomeScreen({ navigation }) {
   const visiblePeople = filter === 'Online' ? matchingPeople.filter(person => person.isOnline === true) : matchingPeople;
   const nearbyPeople = matchingPeople.slice(0, nearbyRevealCount);
   const nearbyCity = profile?.city || profile?.location?.city || 'Your city';
+  const hasMiloConnect = hasActiveMiloConnect(profile);
   React.useEffect(() => {
     if (filter !== 'Nearby') { setNearbyRevealCount(0); return undefined; }
     setNearbyRevealCount(0);
@@ -414,8 +433,8 @@ export default function HomeScreen({ navigation }) {
     waveLoop.start();
     return () => { waveLoop.stop(); nearbyWave.stopAnimation(); };
   }, [filter, nearbyWave]);
-  const connectProfiles = matchingPeople.filter(person => person.isOnline === true);
-  const chatProfiles = people.slice(0, 3);
+  const connectProfiles = [...matchingPeople.filter(person => person.isOnline === true), ...matchingPeople.filter(person => person.isOnline !== true)];
+  const chatProfiles = matchingPeople.slice(0, 3);
   const joinCall = person => {
     navigation.navigate('AudioRoom', {person, currentUser: profile, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true)});
   };
@@ -541,7 +560,7 @@ export default function HomeScreen({ navigation }) {
           ))}
         </View>
 
-        {filter === 'Online' ? <><View style={styles.onlineSectionHeader}><View><Text style={styles.onlineSectionTitle}>MILO Connect</Text><Text style={styles.onlineSectionSubtitle}>People online right now</Text></View><View style={styles.onlineCount}><Text style={styles.onlineCountText}>{visiblePeople.length} people online</Text><View style={styles.onlineCountDot} /></View></View><View style={styles.onlineProfileList}>{visiblePeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>No registered members are online yet.</Text>}</> : filter === 'Nearby' ? <><View style={styles.nearbyHeader}><View><Text style={styles.nearbyTitle}>Nearby</Text><Text style={styles.nearbySubtitle}>Find people in {nearbyCity}</Text></View><View style={styles.cityPill}><MapPin size={13} color="#E5CBFF" /><Text style={styles.cityPillText}>{nearbyCity}</Text><ChevronRight size={13} color="#E5CBFF" /></View></View><NearbyRadar profile={profile} people={nearbyPeople.slice(0, 7)} city={nearbyCity} wave={nearbyWave} /><View style={styles.nearbyCountCard}><View style={styles.nearbyCountIcon}><UserRound size={18} color="#BC76FF" /></View><View><Text style={styles.nearbyCountTitle}>{nearbyPeople.length} people nearby</Text><Text style={styles.nearbyCountSubtitle}>in {nearbyCity}</Text></View><ChevronRight size={18} color="#B96DFF" /></View><Text style={styles.peopleNearbyTitle}>People Nearby</Text><View style={styles.onlineProfileList}>{nearbyPeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !matchingPeople.length && <Text style={styles.miloChatEmpty}>No nearby members are available yet.</Text>}</> : <><SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
+        {filter === 'Online' ? <><View style={styles.onlineSectionHeader}><View><Text style={styles.onlineSectionTitle}>MILO Connect</Text><Text style={styles.onlineSectionSubtitle}>People online right now</Text></View><View style={styles.onlineCount}><Text style={styles.onlineCountText}>{visiblePeople.length} people online</Text><View style={styles.onlineCountDot} /></View></View><View style={styles.onlineProfileList}>{visiblePeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>No registered members are online yet.</Text>}</> : filter === 'Nearby' ? (hasMiloConnect ? <><View style={styles.nearbyHeader}><View><Text style={styles.nearbyTitle}>Nearby</Text><Text style={styles.nearbySubtitle}>Find people in {nearbyCity}</Text></View><View style={styles.cityPill}><MapPin size={13} color="#E5CBFF" /><Text style={styles.cityPillText}>{nearbyCity}</Text><ChevronRight size={13} color="#E5CBFF" /></View></View><NearbyRadar profile={profile} people={nearbyPeople.slice(0, 7)} city={nearbyCity} wave={nearbyWave} /><View style={styles.nearbyCountCard}><View style={styles.nearbyCountIcon}><UserRound size={18} color="#BC76FF" /></View><View><Text style={styles.nearbyCountTitle}>{nearbyPeople.length} people nearby</Text><Text style={styles.nearbyCountSubtitle}>in {nearbyCity}</Text></View><ChevronRight size={18} color="#B96DFF" /></View><Text style={styles.peopleNearbyTitle}>People Nearby</Text><View style={styles.onlineProfileList}>{nearbyPeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !matchingPeople.length && <Text style={styles.miloChatEmpty}>No nearby members are available yet.</Text>}</> : <NearbyUpgrade onUpgrade={() => preview('MILO Connect')} />) : <><SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
           <FlatList
             horizontal
             data={connectRooms}
@@ -556,12 +575,12 @@ export default function HomeScreen({ navigation }) {
           <SectionTitle title="MILO Chat" subtitle="Start a chat before you call." isNew onPress={() => preview('More chats')} />
           <View style={styles.miloChatRow}>{chatProfiles.map(person => <MiloChatCard key={person._id || person.firebaseUid} person={person} cardWidth={miloChatCardWidth} onPress={selectedPerson => navigation.navigate('ChatConversation', { person: selectedPerson })} />)}</View>
           {!loadingPeople && !chatProfiles.length && <Text style={styles.miloChatEmpty}>Registered members will appear here.</Text>}</>}
-        <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
+        {filter === 'For You' && <Pressable onPress={() => preview('MILO Premium')} style={styles.premiumBanner}>
           <Gradient from="#3D255F" to="#8D39E8" radius={15} />
           <Image source={require('../../../assets/icons/crown.png')} style={styles.crown} resizeMode="contain" />
           <View style={styles.premiumCopy}><Text style={styles.premiumTitle}>Go Premium</Text><Text style={styles.premiumText}>Get more visibility, unlock filters{`\n`}and enjoy better matches.</Text></View>
           <View style={styles.upgrade}><Text style={styles.upgradeText}>Upgrade</Text><ChevronRight size={15} color="#FFFFFF" /></View>
-        </Pressable>
+        </Pressable>}
       </ScrollView>
       <WelcomeRewardModal reward={welcomeReward} onClose={() => setWelcomeReward(null)} />
 <Modal transparent animationType="slide" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={() => setDailyClaimOpen(false)}><View style={styles.dailySheetOverlay}><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailySheetBackdrop} /><View style={styles.dailySheet}><View style={styles.dailySheetBackground} /><View style={styles.dailySheetGlow} /><View style={styles.sheetHandle} /><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailyClaimClose}><X size={20} color="#F5EEFF" /></Pressable><View style={styles.dailyCoinStage}><Animated.Text style={[styles.claimSparkle, styles.claimSparkleLeft, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.3, 1, 0.3]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['0deg', '45deg']})}]}]}>✦</Animated.Text><Animated.View style={{transform: [{scale: dailyCoinPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.08]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /></Animated.View><Animated.Text style={[styles.claimSparkle, styles.claimSparkleRight, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.25, 1]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [-7, 8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['45deg', '0deg']})}]}]}>✦</Animated.Text></View><Text style={styles.dailyClaimTitle}>{dailyClaimed ? 'Coins claimed!' : 'Daily coins are ready!'}</Text><Text style={styles.dailyClaimBody}>{dailyClaimed ? '70 coins were added to your wallet.' : 'Claim your 70 free coins for today.'}</Text><Pressable disabled={claimingCoins || dailyClaimed} onPress={claimDailyReward} style={[styles.dailyClaimButton, dailyClaimed && styles.dailyClaimedButton]}><Gradient from="#C05BFF" to="#7025F0" radius={23} /><Coin size={25} /><Text style={styles.dailyClaimButtonText}>{dailyClaimed ? 'Claimed' : claimingCoins ? 'Claiming...' : 'Claim 70 coins'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable></View></View></Modal>
@@ -828,6 +847,11 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
   nearbyCountTitle: {fontFamily: 'Poppins-Medium', color: '#F1EAFE', fontSize: 12},
   nearbyCountSubtitle: {fontFamily: 'Poppins-Regular', color: '#ACA0C1', fontSize: 9, marginTop: -2},
   peopleNearbyTitle: {fontFamily: 'Poppins-SemiBold', color: '#EEE7F8', fontSize: 15, marginTop: 18, marginBottom: 9},
+  nearbyUpgrade: {alignItems: 'center', justifyContent: 'center', minHeight: 365, paddingHorizontal: 34, marginTop: 8},
+  nearbyUpgradeTitle: {fontFamily: 'Poppins-SemiBold', color: '#F5ECFF', fontSize: 17, textAlign: 'center', marginTop: 15},
+  nearbyUpgradeText: {fontFamily: 'Poppins-Regular', color: '#BDB2CC', fontSize: 12, textAlign: 'center', marginTop: 6},
+  nearbyUpgradeButton: {height: 46, minWidth: 148, marginTop: 22, borderRadius: 23, backgroundColor: '#873BF1', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 20},
+  nearbyUpgradeButtonText: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 14},
   connectCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', padding: 8 },
   seeMoreRoomsCard: { height: 234, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#364158', backgroundColor: '#0D1117', padding: 18, justifyContent: 'center', alignItems: 'center' },
   seeMoreRoomsIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(180, 96, 255, 0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
@@ -849,9 +873,9 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
   miloChatAvatar: { width: 60, height: 60, borderRadius: 30, overflow: 'hidden', alignSelf: 'center', marginTop: 1, backgroundColor: '#A8D0F5' },
   miloChatName: { fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 11, marginTop: 5 },
   miloChatLanguage: { fontFamily: 'Poppins-Medium', color: '#F3ECFB', fontSize: 11, marginTop: 4 },
-  miloChatButton: { height: 33, position: 'absolute', left: 7, right: 7, bottom: 10, borderRadius: 13, backgroundColor: '#B863FF', borderWidth: 1, borderColor: '#2B1046', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  miloChatButton: { height: 33, position: 'absolute', left: 7, right: 7, bottom: 10, borderRadius: 13, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#B863FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   miloChatButtonIcon: { width: 15, height: 15, tintColor: '#FFFFFF' },
-  miloChatButtonText: { fontFamily: 'Poppins-Medium', color: '#FFFFFF', fontSize: 11 },
+  miloChatButtonText: { fontFamily: 'Poppins-Medium', color: '#B863FF', fontSize: 11 },
   miloChatEmpty: { color: '#A9A1B9', fontSize: 11, textAlign: 'center', paddingVertical: 24 },
   cardRow: { flexDirection: 'row', gap: 7 },
   featuredCard: { minHeight: 151, borderRadius: 19, overflow: 'hidden', borderWidth: 1, borderColor: '#4D426C', padding: 8 },
