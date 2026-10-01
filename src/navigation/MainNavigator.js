@@ -5,6 +5,7 @@ import ChatsScreen from '../screens/chat/ChatsScreen';
 import ChatConversationScreen from '../screens/chat/ChatConversationScreen';
 import AudioRoomScreen from '../screens/call/AudioRoomScreen';
 import CoinStoreScreen from '../screens/coin/CoinStoreScreen';
+import MiloConnectScreen from '../screens/subscription/MiloConnectScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,6 +19,7 @@ const MainNavigator = () => {
       <Stack.Screen name="AudioRoom" component={AudioRoomScreen} />
       <Stack.Screen name="VideoRoom" component={AudioRoomScreen} />
       <Stack.Screen name="CoinStore" component={CoinStoreScreen} />
+      <Stack.Screen name="MiloConnect" component={MiloConnectScreen} />
     </Stack.Navigator>
   );
 };

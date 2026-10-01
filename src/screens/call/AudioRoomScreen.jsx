@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Mic, MoreHorizontal, PhoneOff, Volume2 } from 'lucide-react-native';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
-import {getMyProfile} from '../../services/userService';
+import { getMyProfile } from '../../services/userService';
 const AVATAR_SIZE = 92;
 const SEARCH_DURATION = 18000;
 const TEMPORARY_PEOPLE = [
@@ -23,16 +23,17 @@ const TEMPORARY_PEOPLE = [
 ];
 
 export default function AudioRoomScreen({ navigation, route }) {
-  const initialPerson = route.params?.person || {};
+  const initialPerson = route.params?.person || null;
   const availablePeople = route.params?.availablePeople;
   const candidates = useMemo(
     () => (Array.isArray(availablePeople) ? availablePeople : []).filter(person => person?._id !== initialPerson?._id),
     [availablePeople, initialPerson?._id],
   );
   const initiallyConnected = route.params?.callStatus === 'connected' && route.params?.connectedPerson;
-  const [callStatus, setCallStatus] = useState(initiallyConnected ? 'connected' : 'searching');
+  const selectedIsOnline = initialPerson?.isOnline === true;
+ const [callStatus, setCallStatus] = useState(initiallyConnected ? 'connected' : 'searching');
   const [connectedPerson, setConnectedPerson] = useState(route.params?.connectedPerson || null);
-  const [waitingPerson, setWaitingPerson] = useState(initialPerson);
+  const [waitingPerson, setWaitingPerson] = useState(initialPerson || {});
   const [temporaryIndex, setTemporaryIndex] = useState(() => Math.floor(Math.random() * TEMPORARY_PEOPLE.length));
   const [self, setSelf] = useState(route.params?.currentUser || null);
   const [muted, setMuted] = useState(false);
@@ -42,7 +43,7 @@ export default function AudioRoomScreen({ navigation, route }) {
     if (route.params?.currentUser) return undefined;
     getMyProfile().then(profile => {
       if (active) setSelf(profile);
-    }).catch(() => {});
+    }).catch(() => { });
     return () => { active = false; };
   }, [route.params?.currentUser]);
   const progress = useRef(new Animated.Value(0)).current;
@@ -80,8 +81,18 @@ export default function AudioRoomScreen({ navigation, route }) {
       useNativeDriver: true,
     });
     progressAnimation.start();
-    // First show the selected person. Only after they are unavailable do we
-    // rotate temporary profiles while searching for a real participant.
+    // An online contact is shown by name until their simulated acceptance.
+    // Offline contacts transition into anonymous, fast-moving avatar search.
+    if (selectedIsOnline) {
+      const acceptTimer = setTimeout(() => {
+        setConnectedPerson(initialPerson);
+        setCallStatus('connected');
+      }, 1800);
+      return () => {
+        progressAnimation.stop();
+        clearTimeout(acceptTimer);
+      };
+    }
     const busyTimer = setTimeout(() => setCallStatus('busy'), 1800);
     let rotateTimer;
     const placeholderTimer = setTimeout(() => {
@@ -90,7 +101,7 @@ export default function AudioRoomScreen({ navigation, route }) {
       setTemporaryIndex(index => (index + 1) % TEMPORARY_PEOPLE.length);
       rotateTimer = setInterval(() => {
         setTemporaryIndex(index => (index + 1) % TEMPORARY_PEOPLE.length);
-      }, 1800);
+      }, 700);
     }, 3300);
     const joinTimer = setTimeout(() => {
       const nextPerson = candidates[Math.floor(Math.random() * candidates.length)];
@@ -105,7 +116,7 @@ export default function AudioRoomScreen({ navigation, route }) {
       if (rotateTimer) clearInterval(rotateTimer);
       clearTimeout(joinTimer);
     };
-  }, [candidates, initiallyConnected, progress]);
+  }, [candidates, initialPerson, initiallyConnected, progress, selectedIsOnline]);
 
   const isConnected = callStatus === 'connected' && Boolean(connectedPerson);
   const temporaryPerson = TEMPORARY_PEOPLE[temporaryIndex];
@@ -113,7 +124,7 @@ export default function AudioRoomScreen({ navigation, route }) {
   const oppositeName = opposite?.nickname || opposite?.name || temporaryPerson.name;
   const selfName = self?.nickname || self?.name || 'You';
   const selectedName = initialPerson?.nickname || initialPerson?.name || oppositeName;
- const rippleStyle = {
+  const rippleStyle = {
     opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.38, 0] }),
     transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.7] }) }],
   };
@@ -141,7 +152,7 @@ export default function AudioRoomScreen({ navigation, route }) {
               <ProfileAvatar {...(opposite?.avatarStyle || opposite)} name={oppositeName} photoUrl={isConnected ? opposite?.photoUrl : undefined} />
               {isConnected && <View style={styles.onlineDot} />}
             </View>
-            <Text style={styles.personName}>{oppositeName}</Text>
+            {(isConnected || waitingPerson) && <Text style={styles.personName}>{oppositeName}</Text>}
             {isConnected ? (
               <>
                 <View style={styles.audioStatus}>
