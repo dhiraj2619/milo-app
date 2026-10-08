@@ -171,10 +171,10 @@ function ConnectProfileCard({ person, cardWidth, onPress }) {
     <Pressable onPress={() => onPress(person)} style={[styles.connectCallButton, isOffline && styles.disabledAction]}><Phone size={16} fill="#FFFFFF" color="#FFFFFF" /><Text style={styles.connectCallText}>Join Call</Text></Pressable>
   </View>;
 }
-function SeeMoreRoomsCard({ cardWidth, onPress }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel="See more rooms" onPress={onPress} style={[styles.seeMoreRoomsCard, { width: cardWidth }]}>
+function SeeMorePersonsCard({ cardWidth, onPress }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel="See more persons" onPress={onPress} style={[styles.seeMoreRoomsCard, { width: cardWidth }]}>
     <View style={styles.seeMoreRoomsIcon}><Phone size={22} color="#DDBBFF" /></View>
-    <Text style={styles.seeMoreRoomsTitle}>See more rooms</Text>
+    <Text style={styles.seeMoreRoomsTitle}>See more persons</Text>
     <Text style={styles.seeMoreRoomsText}>Find your next conversation</Text>
     <View style={styles.seeMoreRoomsArrow}><ChevronRight size={22} color="#FFFFFF" /></View>
   </Pressable>;
@@ -447,7 +447,7 @@ export default function HomeScreen({ navigation }) {
     if (!person) return preview('MILO Connect');
     navigation.navigate(type === 'video' ? 'VideoRoom' : 'AudioRoom', {person, currentUser: profile, isDemo: String(person._id || '').startsWith('demo-'), availablePeople: matchingPeople.filter(member => member.isOnline === true), callType: type});
   };
-  const connectRooms = [...connectProfiles, { _id: 'see-more-rooms', type: 'seeMore' }];
+  const connectRooms = [...connectProfiles, { _id: 'see-more-persons', type: 'seeMore' }];
   const connectCardWidth = Math.max(145, (screenWidth - 42) / 2);
   const miloChatCardWidth = Math.max(96, (screenWidth - 44) / 3);
   const loadMoreProfiles = async () => {
@@ -567,7 +567,7 @@ export default function HomeScreen({ navigation }) {
             horizontal
             data={connectRooms}
             keyExtractor={item => item._id}
-            renderItem={({ item }) => item.type === 'seeMore' ? <SeeMoreRoomsCard cardWidth={connectCardWidth} onPress={() => preview('More rooms')} /> : <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={joinCall} />}
+            renderItem={({ item }) => item.type === 'seeMore' ? <SeeMorePersonsCard cardWidth={connectCardWidth} onPress={() => navigation.navigate('MorePersons', { people: matchingPeople })} /> : <ConnectProfileCard person={item} cardWidth={connectCardWidth} onPress={joinCall} />}
             showsHorizontalScrollIndicator={false}
             decelerationRate="fast"
             snapToInterval={connectCardWidth + 10}

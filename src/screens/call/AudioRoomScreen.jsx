@@ -31,7 +31,7 @@ export default function AudioRoomScreen({ navigation, route }) {
   );
   const initiallyConnected = route.params?.callStatus === 'connected' && route.params?.connectedPerson;
   const selectedIsOnline = initialPerson?.isOnline === true;
- const [callStatus, setCallStatus] = useState(initiallyConnected ? 'connected' : 'searching');
+  const [callStatus, setCallStatus] = useState(initiallyConnected ? 'connected' : 'searching');
   const [connectedPerson, setConnectedPerson] = useState(route.params?.connectedPerson || null);
   const [waitingPerson, setWaitingPerson] = useState(initialPerson || {});
   const [temporaryIndex, setTemporaryIndex] = useState(() => Math.floor(Math.random() * TEMPORARY_PEOPLE.length));
