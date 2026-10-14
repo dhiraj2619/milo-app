@@ -33,6 +33,7 @@ import {
 import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import MiloConnectModal from '../../components/subscription/MiloConnectModal';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
+import { CoinFlight, CountUpBalance } from '../../components/home/CoinClaimAnimation';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 import { claimDailyCoins, getWallet } from '../../services/coinService';
@@ -268,24 +269,49 @@ export default function HomeScreen({ navigation }) {
   const nearbyWave = React.useRef(new Animated.Value(0)).current;
   const drawerX = React.useRef(new Animated.Value(420)).current;
   const preview = label => toast(`${label} is coming soon`);
+  const claimButtonCoinRef = React.useRef(null);
+  const headerCoinRef = React.useRef(null);
+  const finishCoinFlight = React.useRef(null);
+  const [coinFlight, setCoinFlight] = useState(null);
+  const measureCenter = ref => new Promise(resolve => {
+    if (!ref.current) return resolve(null);
+    ref.current.measureInWindow((x, y, width, height) => resolve(width || height ? { x: x + width / 2, y: y + height / 2 } : null));
+  });
+  const closeDailyClaim = () => { if (!claimingCoins) setDailyClaimOpen(false); };
   const claimDailyReward = async () => {
     if (claimingCoins) return;
     setClaimingCoins(true);
+    let wallet;
+    let claimedAt;
     try {
-      const wallet = await claimDailyCoins();
-      const claimedAt = wallet.claimedAt || wallet.lastDailyCoinClaimAt || wallet.dailyClaimedAt || wallet.lastClaimAt || wallet.dailyCoinClaimedAt || new Date().toISOString();
+      wallet = await claimDailyCoins();
+      claimedAt = wallet.claimedAt || wallet.lastDailyCoinClaimAt || wallet.dailyClaimedAt || wallet.lastClaimAt || wallet.dailyCoinClaimedAt || new Date().toISOString();
       const firebaseUid = profile?.firebaseUid || getAuth().currentUser?.uid;
       await saveDailyClaimAt(firebaseUid, claimedAt);
+    } catch (error) {
+      toast(error.response?.data?.message || 'Your daily coins are not ready yet.');
+      setClaimingCoins(false);
+      return;
+    }
+    // The server has credited the coins; the balance shown in the header is only updated once the coins land.
+    const creditCoins = () => {
+      setCoinFlight(null);
       setProfile(current => ({ ...current, coinBalance: wallet.coinBalance ?? current?.coinBalance ?? 0, lastDailyCoinClaimAt: claimedAt }));
       setDailyClaimOpen(false);
       setDailyClaimed(false);
-      setClaimSuccessOpen(true);
-    } catch (error) {
-      toast(error.response?.data?.message || 'Your daily coins are not ready yet.');
-    } finally {
       setClaimingCoins(false);
-    }
+      setTimeout(() => setClaimSuccessOpen(true), 750);
+    };
+    const [from, to] = await Promise.all([measureCenter(claimButtonCoinRef), measureCenter(headerCoinRef)]);
+    if (!from || !to) return creditCoins();
+    finishCoinFlight.current = creditCoins;
+    setCoinFlight({ from, to });
   };
+  const onCoinFlightDone = React.useCallback(() => {
+    const credit = finishCoinFlight.current;
+    finishCoinFlight.current = null;
+    credit?.();
+  }, []);
   React.useEffect(() => {
     if (!dailyClaimOpen || dailyClaimed) return undefined;
     dailyCoinPulse.setValue(0);
@@ -499,8 +525,8 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
           <View style={styles.headerActions}>
             <Pressable accessibilityRole="button" accessibilityLabel="Buy coins" onPress={() => navigation.navigate('CoinStore')} style={styles.wallet}>
-              <Coin size={21} />
-              <Text style={styles.balance}>{profile?.coinBalance ?? 0}</Text>
+              <View ref={headerCoinRef} collapsable={false}><Coin size={21} /></View>
+              <CountUpBalance value={profile?.coinBalance} style={styles.balance} />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Add coins"
@@ -586,7 +612,7 @@ export default function HomeScreen({ navigation }) {
       </ScrollView>
       <WelcomeRewardModal reward={welcomeReward} onClose={() => setWelcomeReward(null)} />
       <MiloConnectModal visible={miloConnectOpen} onClose={() => setMiloConnectOpen(false)} />
-<Modal transparent animationType="slide" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={() => setDailyClaimOpen(false)}><View style={styles.dailySheetOverlay}><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailySheetBackdrop} /><View style={styles.dailySheet}><View style={styles.dailySheetBackground} /><View style={styles.dailySheetGlow} /><View style={styles.sheetHandle} /><Pressable onPress={() => setDailyClaimOpen(false)} style={styles.dailyClaimClose}><X size={20} color="#F5EEFF" /></Pressable><View style={styles.dailyCoinStage}><Animated.Text style={[styles.claimSparkle, styles.claimSparkleLeft, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.3, 1, 0.3]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['0deg', '45deg']})}]}]}>✦</Animated.Text><Animated.View style={{transform: [{scale: dailyCoinPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.08]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /></Animated.View><Animated.Text style={[styles.claimSparkle, styles.claimSparkleRight, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.25, 1]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [-7, 8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['45deg', '0deg']})}]}]}>✦</Animated.Text></View><Text style={styles.dailyClaimTitle}>{dailyClaimed ? 'Coins claimed!' : 'Daily coins are ready!'}</Text><Text style={styles.dailyClaimBody}>{dailyClaimed ? '70 coins were added to your wallet.' : 'Claim your 70 free coins for today.'}</Text><Pressable disabled={claimingCoins || dailyClaimed} onPress={claimDailyReward} style={[styles.dailyClaimButton, dailyClaimed && styles.dailyClaimedButton]}><Gradient from="#C05BFF" to="#7025F0" radius={23} /><Coin size={25} /><Text style={styles.dailyClaimButtonText}>{dailyClaimed ? 'Claimed' : claimingCoins ? 'Claiming...' : 'Claim 70 coins'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable></View></View></Modal>
+<Modal transparent animationType="slide" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={closeDailyClaim}><View style={styles.dailySheetOverlay}><Pressable onPress={closeDailyClaim} style={styles.dailySheetBackdrop} /><View style={styles.dailySheet}><View style={styles.dailySheetBackground} /><View style={styles.dailySheetGlow} /><View style={styles.sheetHandle} /><Pressable onPress={closeDailyClaim} style={styles.dailyClaimClose}><X size={20} color="#F5EEFF" /></Pressable><View style={styles.dailyCoinStage}><Animated.Text style={[styles.claimSparkle, styles.claimSparkleLeft, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.3, 1, 0.3]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['0deg', '45deg']})}]}]}>✦</Animated.Text><Animated.View style={{transform: [{scale: dailyCoinPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.08]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /></Animated.View><Animated.Text style={[styles.claimSparkle, styles.claimSparkleRight, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.25, 1]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [-7, 8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['45deg', '0deg']})}]}]}>✦</Animated.Text></View><Text style={styles.dailyClaimTitle}>{dailyClaimed ? 'Coins claimed!' : 'Daily coins are ready!'}</Text><Text style={styles.dailyClaimBody}>{dailyClaimed ? '70 coins were added to your wallet.' : 'Claim your 70 free coins for today.'}</Text><Pressable disabled={claimingCoins || dailyClaimed} onPress={claimDailyReward} style={[styles.dailyClaimButton, dailyClaimed && styles.dailyClaimedButton]}><Gradient from="#C05BFF" to="#7025F0" radius={23} /><View ref={claimButtonCoinRef} collapsable={false}><Coin size={25} /></View><Text style={styles.dailyClaimButtonText}>{dailyClaimed ? 'Claimed' : claimingCoins ? 'Claiming...' : 'Claim 70 coins'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable></View>{coinFlight && <CoinFlight from={coinFlight.from} to={coinFlight.to} onDone={onCoinFlightDone} />}</View></Modal>
       <Modal transparent animationType="slide" visible={claimSuccessOpen} statusBarTranslucent onRequestClose={() => setClaimSuccessOpen(false)}>
         <View style={styles.claimSuccessOverlay}>
           <Pressable accessibilityLabel="Close reward options" onPress={() => setClaimSuccessOpen(false)} style={styles.claimSuccessBackdrop} />
@@ -614,7 +640,7 @@ export default function HomeScreen({ navigation }) {
             key={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: label === 'Home' }}
-            onPress={() => label === 'Profile' ? openDrawer() : label === 'Chats' ? navigation.navigate('Chats') : label !== 'Home' && preview(label)}
+            onPress={() => label === 'Profile' ? openDrawer() : label === 'Chats' ? navigation.navigate('Chats') : label === 'MILO Special' ? navigation.navigate('MiloSpecial') : label !== 'Home' && preview(label)}
             style={styles.navItem}
           >
             <View style={label === 'Home' && styles.homeGlow}>

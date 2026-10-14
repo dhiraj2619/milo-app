@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -19,10 +19,11 @@ export function Gradient({
   opacity = 1,
 }) {
   const id = useId();
+  // The wrapper fills the parent's border box; percentage sizes on the Svg itself would
+  // resolve against the parent's padded content box and leave the gradient short.
   return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
     <Svg
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
       width="100%"
       height="100%"
       opacity={opacity}
@@ -42,6 +43,7 @@ export function Gradient({
         <Rect width="100%" height="100%" rx={radius} fill={`url(#${id}glow)`} />
       )}
     </Svg>
+    </View>
   );
 }
 export function Coin({ size = 24 }) {
