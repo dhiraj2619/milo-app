@@ -1,10 +1,13 @@
 import React, { useMemo } from 'react';
 import { Avatar, Style } from '@dicebear/core';
-import definition from '@dicebear/styles/avataaars.json';
+import definition from '@dicebear/styles/personas.json';
 import { SvgXml } from 'react-native-svg';
 import { Image } from 'react-native';
 
 const avatarStyle = new Style(definition);
+const MALE_HAIR = ['buzzcut', 'fade', 'shortCombover', 'shortComboverChops', 'curlyHighTop', 'sideShave'];
+const FEMALE_HAIR = ['bobBangs', 'bobCut', 'long', 'extraLong', 'curly', 'pigtails'];
+const BUN_HAIR = ['straightBun', 'curlyBun'];
 
 export default function ProfileAvatar({
   name = 'Milo',
@@ -25,18 +28,12 @@ export default function ProfileAvatar({
         size: 160,
         backgroundColor: [background.replace('#', '')],
         borderRadius: 50,
-        topVariant: bun
-          ? ['bun']
-          : gender === 'male'
-          ? ['shortFlat', 'shortRound', 'shortWaved']
-          : ['straight01', 'straight02', 'curvy', 'bob'],
-        accessoriesVariant: ['round'],
-        accessoriesProbability: glasses ? 100 : 0,
+        hairVariant: bun ? BUN_HAIR : gender === 'male' ? MALE_HAIR : FEMALE_HAIR,
+        eyesVariant: glasses ? ['glasses'] : ['happy', 'open'],
+        mouthVariant: ['smile', 'bigSmile'],
         facialHairProbability: 0,
-        mouthVariant: ['smile'],
-        eyesVariant: ['default', 'happy'],
         hairColor: [hair.replace('#', '')],
-        clothesColor: [shirt.replace('#', '')],
+        clothingColor: [shirt.replace('#', '')],
       }).toString(),
     [name, seed, avatarSeed, background, hair, shirt, gender, glasses, bun],
   );
@@ -48,4 +45,3 @@ export default function ProfileAvatar({
 }
 
 const styles = {photo: {width: '100%', height: '100%'}};
-
