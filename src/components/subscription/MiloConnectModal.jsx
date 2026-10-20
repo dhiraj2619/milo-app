@@ -1,7 +1,6 @@
 import React from 'react';
 import {Image, Modal, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {ChevronRight, MapPin, ShieldCheck, Video, X} from 'lucide-react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 
 const features = [
   {label: 'Video Calls\n& Audio Calls', Icon: Video},
@@ -15,7 +14,7 @@ export default function MiloConnectModal({visible, onClose}) {
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.65)" />
       <View style={styles.overlay}>
         <Pressable onPress={onClose} style={styles.backdrop} />
-        <SafeAreaView style={styles.card} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.card}>
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
             <X size={20} color="#E9DDF8" />
           </Pressable>
@@ -34,7 +33,7 @@ export default function MiloConnectModal({visible, onClose}) {
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.startButton}>
             <Text style={styles.startText}>Get Started</Text><ChevronRight size={20} color="#FFFFFF" />
           </Pressable>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
@@ -43,9 +42,9 @@ export default function MiloConnectModal({visible, onClose}) {
 const styles = StyleSheet.create({
   overlay: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.65)', padding: 16},
   backdrop: {...StyleSheet.absoluteFillObject},
-  card: {width: '92%', maxWidth: 360, height: '70%', borderRadius: 24, overflow: 'hidden', backgroundColor: '#090021', paddingHorizontal: 16, borderWidth: 1, borderColor: '#7541BE'},
+  card: {width: '92%', maxWidth: 360, borderRadius: 24, overflow: 'hidden', backgroundColor: '#090021', paddingHorizontal: 16, borderWidth: 1, borderColor: '#7541BE'},
   close: {position: 'absolute', zIndex: 2, top: 14, left: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(99,57,148,0.36)', alignItems: 'center', justifyContent: 'center'},
-  skip: {alignSelf: 'flex-end', paddingVertical: 7, paddingHorizontal: 5},
+  skip: {alignSelf: 'flex-end', marginTop: 12, paddingVertical: 7, paddingHorizontal: 5},
   skipText: {fontFamily: 'Poppins-Regular', color: '#D8C9F2', fontSize: 11},
   content: {alignItems: 'center', paddingTop: 0},
   unlock: {fontFamily: 'Poppins-SemiBold', color: '#FFFFFF', fontSize: 15, lineHeight: 17},

@@ -577,13 +577,13 @@ export default function HomeScreen({ navigation }) {
               {Icon ? (
                 <Icon
                   size={18}
-                  color={label === 'Nearby' ? '#BD74FF' : '#FFFFFF'}
+                  color={label === filter || label !== 'Nearby' ? '#FFFFFF' : '#BD74FF'}
                   fill={label === 'For You' ? '#FFFFFF' : 'none'}
                 />
               ) : (
-                <View style={styles.filterDot} />
+                <View style={[styles.filterDot, label === filter && styles.selectedFilterDot]} />
               )}
-              <Text style={styles.filterLabel}>{label}</Text>
+              <Text style={[styles.filterLabel, label === filter && styles.selectedFilterLabel]}>{label}</Text>
             </Pressable>
           ))}
         </View>
@@ -692,6 +692,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 8,
     paddingBottom: 18,
+    flexGrow: 1,
     width: '100%',
     maxWidth: 520,
     alignSelf: 'center',
@@ -815,6 +816,8 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
     marginVertical: 4,
   },
   filterLabel: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#EEE7FA' },
+  selectedFilterLabel: { color: '#FFFFFF' },
+  selectedFilterDot: { backgroundColor: '#FFFFFF' },
   sectionHeading: { marginTop: 18, marginBottom: 9 },
   sectionLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: {
@@ -876,7 +879,7 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
   nearbyCountTitle: {fontFamily: 'Poppins-Medium', color: '#F1EAFE', fontSize: 12},
   nearbyCountSubtitle: {fontFamily: 'Poppins-Regular', color: '#ACA0C1', fontSize: 9, marginTop: -2},
   peopleNearbyTitle: {fontFamily: 'Poppins-SemiBold', color: '#EEE7F8', fontSize: 15, marginTop: 18, marginBottom: 9},
-  nearbyUpgrade: {alignItems: 'center', justifyContent: 'center', minHeight: 365, paddingHorizontal: 34, marginTop: 8},
+  nearbyUpgrade: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 34},
   nearbyUpgradeTitle: {fontFamily: 'Poppins-SemiBold', color: '#F5ECFF', fontSize: 17, textAlign: 'center', marginTop: 15},
   nearbyUpgradeText: {fontFamily: 'Poppins-Regular', color: '#BDB2CC', fontSize: 12, textAlign: 'center', marginTop: 6},
   nearbyUpgradeButton: {height: 46, minWidth: 148, marginTop: 22, borderRadius: 23, backgroundColor: '#873BF1', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 20},
