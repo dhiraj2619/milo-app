@@ -33,6 +33,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>MILO uses the front camera so you can take a selfie to match your avatar skin tone. The photo stays on your phone.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string/>
 	<key>UILaunchStoryboardName</key>
