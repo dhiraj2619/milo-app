@@ -152,7 +152,7 @@ export default function MiloSpecialScreen({ navigation }) {
         </Pressable>
       </>}
     </ScrollView>
-    <MiloConnectModal visible={miloConnectOpen} onClose={() => setMiloConnectOpen(false)} />
+    <MiloConnectModal visible={miloConnectOpen} onClose={() => setMiloConnectOpen(false)} onGetStarted={() => { setMiloConnectOpen(false); navigation.navigate('MiloConnectPlans'); }} />
     <View style={styles.bottomBar}>{TABS.map(({ label, icon: Icon }) => {
       const active = label === 'MILO Special';
       return <Pressable key={label} accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={() => onTabPress(label)} style={styles.tab}>

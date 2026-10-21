@@ -30,7 +30,7 @@ export default function MiloConnectScreen({navigation}) {
           ))}
         </View>
       </View>
-      <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.startButton}>
+      <Pressable accessibilityRole="button" onPress={() => navigation.replace('MiloConnectPlans')} style={styles.startButton}>
         <Text style={styles.startText}>Get Started</Text>
         <ChevronRight size={20} color="#FFFFFF" />
       </Pressable>

@@ -8,7 +8,7 @@ const features = [
   {label: 'Real People\nNearby', Icon: MapPin},
 ];
 
-export default function MiloConnectModal({visible, onClose}) {
+export default function MiloConnectModal({visible, onClose, onGetStarted}) {
   return (
     <Modal transparent animationType="slide" visible={visible} statusBarTranslucent onRequestClose={onClose}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.65)" />
@@ -30,7 +30,7 @@ export default function MiloConnectModal({visible, onClose}) {
               {features.map(({label, Icon}) => <View key={label} style={styles.feature}><View style={styles.featureIcon}><Icon size={18} color="#C981FF" /></View><Text style={styles.featureText}>{label}</Text></View>)}
             </View>
           </View>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.startButton}>
+          <Pressable accessibilityRole="button" onPress={onGetStarted || onClose} style={styles.startButton}>
             <Text style={styles.startText}>Get Started</Text><ChevronRight size={20} color="#FFFFFF" />
           </Pressable>
         </View>

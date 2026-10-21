@@ -39,9 +39,8 @@ import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 import { claimDailyCoins, getWallet } from '../../services/coinService';
 import { getConversations } from '../../services/chatService';
 import { consumeWelcomeReward, getDailyClaimAt, saveDailyClaimAt } from '../../services/sessionService';
-import { getAuth, getIdToken } from '@react-native-firebase/auth';
-import { io } from 'socket.io-client';
-import { SERVER_URL } from '../../config/config';
+import { getAuth } from '@react-native-firebase/auth';
+import { getSocket } from '../../services/socketService';
 
 /* const PEOPLE = [
   {
@@ -398,29 +397,26 @@ export default function HomeScreen({ navigation }) {
     return () => { mounted = false; };
   }, []);
   React.useEffect(() => {
-    let socket;
-    let mounted = true;
-    const connectPresence = async () => {
-      try {
-        const currentUser = getAuth().currentUser;
-        if (!currentUser) return;
-        const idToken = await getIdToken(currentUser);
-        socket = io(SERVER_URL.replace(/\/+$/, ''), { auth: { token: idToken }, transports: ['websocket'] });
-        socket.on('user:presence', presence => {
-          if (!mounted) return;
-          setPeople(current => current.map(person => person.firebaseUid === presence.firebaseUid ? { ...person, isOnline: presence.isOnline, lastSeen: presence.lastSeen || null } : person));
-        });
-        socket.on('chat:updated', () => {
-          getConversations()
-            .then(conversations => {
-              if (mounted) setUnreadChats(conversations.reduce((total, conversation) => total + (conversation.unreadCount || 0), 0));
-            })
-            .catch(() => { });
-        });
-      } catch (_) { }
+    // Shared app-wide socket (also used for calls), so only listeners are removed on unmount.
+    const socket = getSocket();
+    const onPresence = presence => {
+      setPeople(current => current.map(person => person.firebaseUid === presence.firebaseUid ? { ...person, isOnline: presence.isOnline, lastSeen: presence.lastSeen || null } : person));
     };
-    connectPresence();
-    return () => { mounted = false; socket?.disconnect(); };
+    let mounted = true;
+    const onChatUpdated = () => {
+      getConversations()
+        .then(conversations => {
+          if (mounted) setUnreadChats(conversations.reduce((total, conversation) => total + (conversation.unreadCount || 0), 0));
+        })
+        .catch(() => { });
+    };
+    socket.on('user:presence', onPresence);
+    socket.on('chat:updated', onChatUpdated);
+    return () => {
+      mounted = false;
+      socket.off('user:presence', onPresence);
+      socket.off('chat:updated', onChatUpdated);
+    };
   }, []);
   const preferredGender = profile?.gender?.toLowerCase();
   const matchesGenderPreference = person => {
@@ -611,7 +607,7 @@ export default function HomeScreen({ navigation }) {
         </Pressable>}
       </ScrollView>
       <WelcomeRewardModal reward={welcomeReward} onClose={() => setWelcomeReward(null)} />
-      <MiloConnectModal visible={miloConnectOpen} onClose={() => setMiloConnectOpen(false)} />
+      <MiloConnectModal visible={miloConnectOpen} onClose={() => setMiloConnectOpen(false)} onGetStarted={() => { setMiloConnectOpen(false); navigation.navigate('MiloConnectPlans'); }} />
 <Modal transparent animationType="slide" visible={dailyClaimOpen} statusBarTranslucent onRequestClose={closeDailyClaim}><View style={styles.dailySheetOverlay}><Pressable onPress={closeDailyClaim} style={styles.dailySheetBackdrop} /><View style={styles.dailySheet}><View style={styles.dailySheetBackground} /><View style={styles.dailySheetGlow} /><View style={styles.sheetHandle} /><Pressable onPress={closeDailyClaim} style={styles.dailyClaimClose}><X size={20} color="#F5EEFF" /></Pressable><View style={styles.dailyCoinStage}><Animated.Text style={[styles.claimSparkle, styles.claimSparkleLeft, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [0.3, 1, 0.3]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [7, -8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['0deg', '45deg']})}]}]}>✦</Animated.Text><Animated.View style={{transform: [{scale: dailyCoinPulse.interpolate({inputRange: [0, 1], outputRange: [0.94, 1.08]})}]}}><Image source={require('../../../assets/images/coin.png')} style={styles.dailyClaimCoin} resizeMode="contain" /></Animated.View><Animated.Text style={[styles.claimSparkle, styles.claimSparkleRight, {opacity: dailySparkles.interpolate({inputRange: [0, 0.5, 1], outputRange: [1, 0.25, 1]}), transform: [{translateY: dailySparkles.interpolate({inputRange: [0, 1], outputRange: [-7, 8]})}, {rotate: dailySparkles.interpolate({inputRange: [0, 1], outputRange: ['45deg', '0deg']})}]}]}>✦</Animated.Text></View><Text style={styles.dailyClaimTitle}>{dailyClaimed ? 'Coins claimed!' : 'Daily coins are ready!'}</Text><Text style={styles.dailyClaimBody}>{dailyClaimed ? '70 coins were added to your wallet.' : 'Claim your 70 free coins for today.'}</Text><Pressable disabled={claimingCoins || dailyClaimed} onPress={claimDailyReward} style={[styles.dailyClaimButton, dailyClaimed && styles.dailyClaimedButton]}><Gradient from="#C05BFF" to="#7025F0" radius={23} /><View ref={claimButtonCoinRef} collapsable={false}><Coin size={25} /></View><Text style={styles.dailyClaimButtonText}>{dailyClaimed ? 'Claimed' : claimingCoins ? 'Claiming...' : 'Claim 70 coins'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable></View>{coinFlight && <CoinFlight from={coinFlight.from} to={coinFlight.to} onDone={onCoinFlightDone} />}</View></Modal>
       <Modal transparent animationType="slide" visible={claimSuccessOpen} statusBarTranslucent onRequestClose={() => setClaimSuccessOpen(false)}>
         <View style={styles.claimSuccessOverlay}>

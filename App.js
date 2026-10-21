@@ -7,6 +7,8 @@ import ToastProvider from './src/components/ui/ToastProvider';
 import {getAuth} from '@react-native-firebase/auth';
 import {clearSessionProfile, getSessionProfile, saveSessionProfile} from './src/services/sessionService';
 import {getMyProfile} from './src/services/userService';
+import CallProvider from './src/call/CallProvider';
+import {navigationRef} from './src/navigation/navigationRef';
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -42,11 +44,13 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <ToastProvider>
+      <CallProvider enabled={sessionReady && signedIn}>
       {showSplash || !sessionReady ? <SplashScreen onFinish={finishSplash} /> : (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
           <RootNavigator signedIn={signedIn} onProfileCompleted={handleProfileCompleted} />
         </NavigationContainer>
       )}
+      </CallProvider>
       </ToastProvider>
     </SafeAreaProvider>
   );
