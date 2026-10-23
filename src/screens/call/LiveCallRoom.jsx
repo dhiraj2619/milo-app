@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ImageBackground, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RTCView } from 'react-native-webrtc';
-import { ArrowLeft, Mic, MicOff, MoreHorizontal, PhoneOff, SwitchCamera, Video, VideoOff, Volume2, VolumeX } from 'lucide-react-native';
+import { ArrowLeft, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, SwitchCamera, Video, VideoOff, Volume2, VolumeX } from 'lucide-react-native';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { getMyProfile } from '../../services/userService';
 import { useCall } from '../../call/CallProvider';
 import { Control, formatDuration, styles } from './callRoomUi';
 
 const LEAVE_AFTER_END_MS = 1600;
+const MAX_SUGGESTIONS = 4;
+// When the person couldn't be reached, offer other online people instead of leaving.
+const UNREACHABLE_REASONS = ['offline', 'busy', 'no_answer', 'rejected', 'not_found'];
 
 const endedText = (reason, name) => ({
   offline: `${name} is offline right now`,
@@ -52,12 +55,21 @@ export default function LiveCallRoom({ navigation, route }) {
 
   // A previous call may still be showing "ended" when this screen opens, so
   // only leave once this screen has seen its own call in progress.
+  if (!['idle', 'ended'].includes(call.status)) joinedRef.current = true;
+  const peerId = call.peer?._id || route.params?.person?._id;
+  const suggestions = (Array.isArray(route.params?.availablePeople) ? route.params.availablePeople : [])
+    .filter(person => person?._id && person._id !== peerId)
+    .slice(0, MAX_SUGGESTIONS);
+  const showSuggestions = call.status === 'ended' && joinedRef.current && UNREACHABLE_REASONS.includes(call.endReason) && suggestions.length > 0;
+
   useEffect(() => {
-    if (!['idle', 'ended'].includes(call.status)) joinedRef.current = true;
-    if (call.status !== 'ended' || !joinedRef.current) return undefined;
+    if (call.status !== 'ended' || !joinedRef.current || showSuggestions) return undefined;
     const timer = setTimeout(() => { if (navigation.canGoBack()) navigation.goBack(); }, LEAVE_AFTER_END_MS);
     return () => clearTimeout(timer);
-  }, [call.status, navigation]);
+  }, [call.status, navigation, showSuggestions]);
+
+  // Restart this screen with the new person so the call state starts fresh.
+  const callSomeoneElse = person => navigation.replace(route.name, { ...route.params, person, incomingCallId: undefined });
 
   useEffect(() => {
     if (!call.connectedAt) return undefined;
@@ -148,6 +160,34 @@ export default function LiveCallRoom({ navigation, route }) {
                 <Text style={styles.callingText}>{statusText}</Text>
               )}
             </View>
+            {showSuggestions ? (
+              <View style={liveStyles.suggestions}>
+                <Text style={liveStyles.suggestionsTitle}>Talk to someone else</Text>
+                <ScrollView style={liveStyles.suggestionsList} showsVerticalScrollIndicator={false}>
+                  {suggestions.map(person => {
+                    const name = person.nickname || person.name || 'MILO member';
+                    return (
+                      <Pressable key={person._id} accessibilityRole="button" accessibilityLabel={`Call ${name}`} onPress={() => callSomeoneElse(person)} style={({ pressed }) => [liveStyles.suggestionRow, pressed && styles.pressed]}>
+                        <View style={liveStyles.suggestionAvatar}>
+                          <View style={liveStyles.suggestionAvatarClip}>
+                            <ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} />
+                          </View>
+                          <View style={liveStyles.suggestionDot} />
+                        </View>
+                        <View style={liveStyles.suggestionCopy}>
+                          <Text numberOfLines={1} style={liveStyles.suggestionName}>{name}</Text>
+                          <Text style={liveStyles.suggestionStatus}>Online now</Text>
+                        </View>
+                        <View style={liveStyles.suggestionCall}>
+                          {isVideo ? <Video color="#fff" size={15} /> : <Phone color="#fff" size={14} fill="#fff" />}
+                          <Text style={liveStyles.suggestionCallText}>Call</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : (
             <View style={[styles.selfBlock, liveStyles.selfBlockSpacing]}>
               <View style={styles.selfFrame}>
                 {showSelfVideo ? (
@@ -159,6 +199,7 @@ export default function LiveCallRoom({ navigation, route }) {
               {controls.muted && <View style={styles.selfMuted}><MicOff color="#fff" size={12} /></View>}
               <Text style={styles.selfName}>You</Text>
             </View>
+            )}
           </View>
         )}
 
@@ -184,4 +225,16 @@ export default function LiveCallRoom({ navigation, route }) {
 
 const liveStyles = StyleSheet.create({
   selfBlockSpacing: { marginTop: 44 },
+  suggestions: { width: '100%', maxWidth: 360, marginTop: 28 },
+  suggestionsTitle: { color: '#ede9fe', fontSize: 14, fontWeight: '700', marginBottom: 10, marginLeft: 4 },
+  suggestionsList: { maxHeight: 264 },
+  suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginBottom: 8, borderRadius: 18, backgroundColor: 'rgba(18,4,54,0.72)', borderWidth: 1, borderColor: 'rgba(137,77,201,0.32)' },
+  suggestionAvatar: { width: 44, height: 44 },
+  suggestionAvatarClip: { flex: 1, borderRadius: 22, overflow: 'hidden', backgroundColor: '#25104b' },
+  suggestionDot: { position: 'absolute', right: 0, bottom: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#21e6a1', borderWidth: 2, borderColor: '#120436' },
+  suggestionCopy: { flex: 1 },
+  suggestionName: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  suggestionStatus: { color: '#21e6a1', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  suggestionCall: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: 17, backgroundColor: '#a855f7' },
+  suggestionCallText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 });

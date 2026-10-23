@@ -10,6 +10,7 @@ import MiloConnectScreen from '../screens/subscription/MiloConnectScreen';
 import MiloConnectPlansScreen from '../screens/subscription/MiloConnectPlansScreen';
 import MorePersonsScreen from '../screens/home/MorePersonsScreen';
 import MiloSpecialScreen from '../screens/special/MiloSpecialScreen';
+import ConnectScreen from '../screens/connect/ConnectScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,7 @@ const MainNavigator = () => {
       <Stack.Screen name="MiloConnectPlans" component={MiloConnectPlansScreen} />
       <Stack.Screen name="MorePersons" component={MorePersonsScreen} />
       <Stack.Screen name="MiloSpecial" component={MiloSpecialScreen} />
+      <Stack.Screen name="Connect" component={ConnectScreen} />
     </Stack.Navigator>
   );
 };

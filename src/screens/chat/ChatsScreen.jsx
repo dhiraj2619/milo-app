@@ -236,7 +236,7 @@ export default function ChatsScreen({navigation}) {
         </View>
       </View>
     </Modal>
-    <View style={styles.bottomBar}>{tabs.map(({label, icon: Icon}) => <Pressable key={label} onPress={() => label === 'Home' ? navigation.navigate('Home') : label === 'Profile' ? navigation.navigate('Profile') : label === 'MILO Special' ? navigation.navigate('MiloSpecial') : label !== 'Chats' && toast(`${label} is coming soon`)} style={styles.tab}><View>{label === 'Chats' ? <Image source={require('../../../assets/icons/message.png')} style={styles.tabMessageIcon} resizeMode="contain" /> : <Icon size={24} color="#C5BED3" fill="none" />}</View><Text style={[styles.tabText, label === 'Chats' && styles.activeTabText]}>{label}</Text></Pressable>)}</View>
+    <View style={styles.bottomBar}>{tabs.map(({label, icon: Icon}) => <Pressable key={label} onPress={() => label === 'Home' ? navigation.navigate('Home') : label === 'Profile' ? navigation.navigate('Profile') : label === 'MILO Special' ? navigation.navigate('MiloSpecial') : label === 'Connect' ? navigation.navigate('Connect') : label !== 'Chats' && toast(`${label} is coming soon`)} style={styles.tab}><View>{label === 'Chats' ? <Image source={require('../../../assets/icons/message.png')} style={styles.tabMessageIcon} resizeMode="contain" /> : <Icon size={24} color="#C5BED3" fill="none" />}</View><Text style={[styles.tabText, label === 'Chats' && styles.activeTabText]}>{label}</Text></Pressable>)}</View>
   </SafeAreaView>;
 }
 

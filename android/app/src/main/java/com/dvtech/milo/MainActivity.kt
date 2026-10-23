@@ -1,4 +1,4 @@
-package com.milo
+package com.dvtech.milo
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

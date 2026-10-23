@@ -115,7 +115,7 @@ export default function MiloSpecialScreen({ navigation }) {
     if (label === 'Home') return navigation.navigate('Home');
     if (label === 'Chats') return navigation.navigate('Chats');
     if (label === 'Profile') return navigation.navigate('Profile');
-    if (label !== 'MILO Special') toast(`${label} is coming soon`);
+    if (label === 'Connect') return navigation.navigate('Connect');
   };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom', 'left', 'right']}>

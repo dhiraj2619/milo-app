@@ -14,7 +14,7 @@ export async function getSessionProfile() {
 }
 
 export async function clearSessionProfile() {
-  await AsyncStorage.multiRemove([PROFILE_KEY, DAILY_CLAIM_KEY]);
+  await AsyncStorage.removeMany([PROFILE_KEY, DAILY_CLAIM_KEY]);
 }
 
 export async function saveDailyClaimAt(firebaseUid, claimedAt) {

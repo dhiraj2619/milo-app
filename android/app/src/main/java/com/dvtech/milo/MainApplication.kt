@@ -1,4 +1,4 @@
-package com.milo
+package com.dvtech.milo
 
 import android.app.Application
 import com.facebook.react.PackageList

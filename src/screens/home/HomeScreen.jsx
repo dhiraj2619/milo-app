@@ -636,7 +636,7 @@ export default function HomeScreen({ navigation }) {
             key={label}
             accessibilityRole="tab"
             accessibilityState={{ selected: label === 'Home' }}
-            onPress={() => label === 'Profile' ? openDrawer() : label === 'Chats' ? navigation.navigate('Chats') : label === 'MILO Special' ? navigation.navigate('MiloSpecial') : label !== 'Home' && preview(label)}
+            onPress={() => label === 'Profile' ? openDrawer() : label === 'Chats' ? navigation.navigate('Chats') : label === 'MILO Special' ? navigation.navigate('MiloSpecial') : label === 'Connect' ? navigation.navigate('Connect') : label !== 'Home' && preview(label)}
             style={styles.navItem}
           >
             <View style={label === 'Home' && styles.homeGlow}>

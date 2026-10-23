@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:888037381795:android:a10d80ef8f8bb57f1b1116",
+        "android_client_info": {
+          "package_name": "com.dvtech.milo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1A3kASuzRb522mrvrULVrF3BvYCsQyYU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:888037381795:android:8eb4eee6c138f9491b1116",
         "android_client_info": {
           "package_name": "com.milo"
