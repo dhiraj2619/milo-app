@@ -9,6 +9,7 @@ import { registerForPush } from '../services/pushService';
 // Call lifecycle:
 //   outgoing: idle -> starting -> ringing -> connecting -> connected -> ended
 //   incoming: idle -> incoming -> connecting -> connected -> ended
+//   matched (MILO Special rooms): idle -> connecting -> connected -> ended, no ringing
 // The caller sends the WebRTC offer once the callee accepts; the callee answers.
 
 const ACK_TIMEOUT_MS = 10000;
@@ -23,6 +24,10 @@ const IDLE_CALL = {
   delivery: null,
   endReason: null,
   connectedAt: null,
+  // Matched calls only: the room key, its icebreaker question and Speed Talk's time limit.
+  room: null,
+  question: null,
+  maxSeconds: null,
   remoteMedia: { muted: false, cameraOff: false },
 };
 const DEFAULT_CONTROLS = { muted: false, cameraOff: false, speaker: false };
@@ -35,6 +40,8 @@ export default function CallProvider({ enabled, onIncomingCall, children }) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [controls, setControls] = useState(DEFAULT_CONTROLS);
+  // Latest gift in this call, for the animation: {key, giftId, fromMe, fromName}.
+  const [giftEvent, setGiftEvent] = useState(null);
   const callRef = useRef(IDLE_CALL);
   const controlsRef = useRef(DEFAULT_CONTROLS);
   const pcRef = useRef(null);
@@ -210,6 +217,17 @@ export default function CallProvider({ enabled, onIncomingCall, children }) {
     localStreamRef.current?.getVideoTracks().forEach(track => track._switchCamera?.());
   }, []);
 
+  // Resolves to the server's answer: {ok: true, coinBalance} or {ok: false, reason}.
+  const sendGift = useCallback(giftId => new Promise(resolve => {
+    const { callId, status } = callRef.current;
+    if (!callId || status !== 'connected') return resolve({ ok: false, reason: 'not_in_call' });
+    // Lets the server charge a retried send only once.
+    const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    getSocket().timeout(ACK_TIMEOUT_MS).emit('call:gift', { callId, giftId, requestId }, (error, ack) => {
+      resolve(error ? { ok: false, reason: 'network' } : (ack || { ok: false, reason: 'error' }));
+    });
+  }), []);
+
   const toggleSpeaker = useCallback(() => {
     const speaker = !controlsRef.current.speaker;
     InCallManager.setForceSpeakerphoneOn(speaker);
@@ -260,7 +278,33 @@ export default function CallProvider({ enabled, onIncomingCall, children }) {
         console.warn('Call signaling failed:', error?.message || error);
       }
     },
+    // A MILO Special room paired us with someone. Both sides get the mic ready and tell the server;
+    // the "offer" side then receives call:accepted and starts WebRTC exactly like an outgoing call.
+    matched: async ({ callId, callType, room, question, maxSeconds, peer, role, iceServers }) => {
+      if (isBusy()) {
+        getSocket().emit('call:end', { callId });
+        return;
+      }
+      clearTimeout(resetTimerRef.current);
+      iceServersRef.current = iceServers || [];
+      updateCall({ ...IDLE_CALL, status: 'connecting', direction: role === 'offer' ? 'outgoing' : 'incoming', callId, callType, peer, room, question, maxSeconds });
+      updateControls({ ...DEFAULT_CONTROLS, speaker: callType === 'video' });
+      try {
+        if (!(await prepareLocalMedia(callType))) return;
+      } catch (error) {
+        getSocket().emit('call:end', { callId });
+        finish(error.reason || 'media_error');
+        return;
+      }
+      if (role === 'answer') createPeer();
+      getSocket().emit('call:ready', { callId });
+    },
     // The callee opened the app from the notification, so their phone is now ringing.
+    gift: ({ callId, giftId, fromUserId, fromName }) => {
+      if (callId !== callRef.current.callId) return;
+      const fromMe = String(fromUserId) !== String(callRef.current.peer?._id);
+      setGiftEvent({ key: `${Date.now()}-${Math.random()}`, giftId, fromMe, fromName });
+    },
     ringing: ({ callId }) => {
       if (callId === callRef.current.callId && callRef.current.status === 'ringing') updateCall({ delivery: 'ringing' });
     },
@@ -277,6 +321,8 @@ export default function CallProvider({ enabled, onIncomingCall, children }) {
       'call:accepted': payload => handlersRef.current.accepted(payload).catch(() => finish('failed')),
       'call:signal': payload => handlersRef.current.signal(payload),
       'call:ringing': payload => handlersRef.current.ringing(payload),
+      'call:gift': payload => handlersRef.current.gift(payload),
+      'call:matched': payload => handlersRef.current.matched(payload).catch(() => finish('failed')),
       'call:ended': payload => handlersRef.current.ended(payload),
     };
     Object.entries(events).forEach(([event, handler]) => socket.on(event, handler));
@@ -305,7 +351,9 @@ export default function CallProvider({ enabled, onIncomingCall, children }) {
     toggleCamera,
     switchCamera,
     toggleSpeaker,
-  }), [acceptCall, call, controls, endCall, localStream, rejectCall, remoteStream, startCall, switchCamera, toggleCamera, toggleMute, toggleSpeaker]);
+    sendGift,
+    giftEvent,
+  }), [acceptCall, call, controls, endCall, giftEvent, localStream, rejectCall, remoteStream, sendGift, startCall, switchCamera, toggleCamera, toggleMute, toggleSpeaker]);
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
 }

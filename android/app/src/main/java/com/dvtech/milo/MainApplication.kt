@@ -31,7 +31,7 @@ class MainApplication : Application(), ReactApplication {
     createNotificationChannels()
   }
 
-  // Push notifications from the server name these channel ids ("calls", "missed_calls").
+  // Push notifications from the server name these channel ids ("calls", "missed_calls", "activity").
   private fun createNotificationChannels() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val calls = NotificationChannel("calls", "Incoming calls", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -50,6 +50,9 @@ class MainApplication : Application(), ReactApplication {
     val missedCalls = NotificationChannel("missed_calls", "Missed calls", NotificationManager.IMPORTANCE_DEFAULT).apply {
       description = "Calls you didn't pick up"
     }
-    getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(calls, missedCalls))
+    val activity = NotificationChannel("activity", "Likes and activity", NotificationManager.IMPORTANCE_DEFAULT).apply {
+      description = "When someone likes your profile"
+    }
+    getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(calls, missedCalls, activity))
   }
 }

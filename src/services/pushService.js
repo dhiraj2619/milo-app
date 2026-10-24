@@ -1,9 +1,10 @@
 import {PermissionsAndroid, Platform} from 'react-native';
 import {getAuth, getIdToken} from '@react-native-firebase/auth';
-import {getMessaging, getToken, onTokenRefresh, requestPermission} from '@react-native-firebase/messaging';
+import {getInitialNotification, getMessaging, getToken, onNotificationOpenedApp, onTokenRefresh, requestPermission} from '@react-native-firebase/messaging';
 import api from './api';
+import {navigateToMain} from '../navigation/navigationRef';
 
-// Push notifications reach users whose app is closed: incoming calls and missed calls.
+// Push notifications reach users whose app is closed: incoming calls, missed calls and likes.
 // Tapping a call notification just opens the app; the server re-sends the ringing call
 // over the socket once it connects.
 
@@ -46,9 +47,16 @@ export function registerForPush() {
   const unsubscribe = onTokenRefresh(getMessaging(), token => {
     if (active) sendToken(token).catch(() => { });
   });
+  // Tapping a notification: open the screen it is about. Calls need nothing here (see above).
+  const openFrom = message => {
+    if (active && message?.data?.type === 'like') navigateToMain('MiloSpecial');
+  };
+  const stopOpened = onNotificationOpenedApp(getMessaging(), openFrom);
+  getInitialNotification(getMessaging()).then(openFrom).catch(() => { });
   return () => {
     active = false;
     unsubscribe();
+    stopOpened();
   };
 }
 

@@ -11,6 +11,9 @@ import MiloConnectPlansScreen from '../screens/subscription/MiloConnectPlansScre
 import MorePersonsScreen from '../screens/home/MorePersonsScreen';
 import MiloSpecialScreen from '../screens/special/MiloSpecialScreen';
 import ConnectScreen from '../screens/connect/ConnectScreen';
+import MatchQueueScreen from '../screens/special/MatchQueueScreen';
+import UserProfileScreen from '../screens/profile/UserProfileScreen';
+import RecentCallsScreen from '../screens/connect/RecentCallsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +33,9 @@ const MainNavigator = () => {
       <Stack.Screen name="MorePersons" component={MorePersonsScreen} />
       <Stack.Screen name="MiloSpecial" component={MiloSpecialScreen} />
       <Stack.Screen name="Connect" component={ConnectScreen} />
+      <Stack.Screen name="MatchQueue" component={MatchQueueScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="RecentCalls" component={RecentCallsScreen} />
     </Stack.Navigator>
   );
 };

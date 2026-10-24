@@ -4,12 +4,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { House, MessageCircle, Phone, Plus, Shuffle, Sparkles, UserRound, Users, Video } from 'lucide-react-native';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import FavouritesStrip from '../../components/favourites/FavouritesStrip';
+import RecentCallRow from '../../components/calls/RecentCallRow';
+import { useFocusEffect } from '@react-navigation/native';
+import { InterestChips } from '../../components/profile/Interests';
+import { interestEmoji } from '../../config/profileOptions';
 import { Coin, Gradient } from '../../components/home/HomeDecor';
 import { useToast } from '../../components/ui/ToastProvider';
-import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
+import { getDiscoverProfiles, getMyCalls, getMyProfile } from '../../services/userService';
 
 const TABS = [{ label: 'Home', icon: House }, { label: 'Chats', icon: MessageCircle }, { label: 'MILO Special', icon: Sparkles }, { label: 'Connect', icon: Phone }, { label: 'Profile', icon: UserRound }];
 const PAGE_SIZE = 20;
+const RECENT_SHOWN = 3;
 const CALL_PRICES = { audio: '15 /min', video: '60 /min' };
 const nameOf = person => person?.nickname || person?.name || 'MILO member';
 const keyOf = person => person._id || person.firebaseUid;
@@ -32,10 +37,11 @@ function QuickConnect({ type, disabled, onPress }) {
   </Pressable>;
 }
 
-function PersonRow({ person, onCall }) {
+function PersonRow({ person, onCall, onOpen, myInterests }) {
   const online = person.isOnline === true;
   const name = nameOf(person);
   return <View style={styles.row}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Open ${name}'s profile`} onPress={() => onOpen(person)} style={styles.rowOpen}>
     <View style={styles.rowAvatar}>
       <View style={styles.rowAvatarClip}><ProfileAvatar {...(person.avatarStyle || person)} name={name} photoUrl={person.photoUrl} /></View>
       <View style={[styles.presenceDot, !online && styles.offlineDot]} />
@@ -44,7 +50,9 @@ function PersonRow({ person, onCall }) {
       <Text numberOfLines={1} style={styles.rowName}>{name}{person.age ? `, ${person.age}` : ''}</Text>
       <Text style={[styles.rowStatus, !online && styles.rowStatusAway]}>{online ? 'Online now' : 'Away'}</Text>
       <View style={styles.rowTags}>{(person.languages?.length ? person.languages : ['English']).slice(0, 2).map(language => <View key={language} style={styles.rowTag}><Text style={styles.rowTagText}>{language}</Text></View>)}</View>
+      {person.interests?.length > 0 && <View style={styles.rowInterests}><InterestChips interests={person.interests} max={3} small highlight={myInterests} /></View>}
     </View>
+    </Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel={`Audio call ${name}`} hitSlop={4} onPress={() => onCall(person, 'audio')} style={({ pressed }) => [styles.callButton, styles.callAudio, !online && styles.callAway, pressed && styles.pressed]}>
       <Phone size={17} color="#FFFFFF" fill="#FFFFFF" />
     </Pressable>
@@ -64,6 +72,14 @@ export default function ConnectScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState('All');
+  const [recentCalls, setRecentCalls] = useState([]);
+
+  // "Recent": refreshed every time Connect comes into view, e.g. right after a call.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    getMyCalls().then(data => active && setRecentCalls(data.calls.slice(0, RECENT_SHOWN))).catch(() => { });
+    return () => { active = false; };
+  }, []));
 
   const loadFirstPage = useCallback(async () => {
     try {
@@ -123,9 +139,18 @@ export default function ConnectScreen({ navigation }) {
     matchingPeople.forEach(person => (person.languages || []).forEach(language => counts.set(language, (counts.get(language) || 0) + 1)));
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([language]) => language);
   }, [matchingPeople]);
+  // Interest filters: the user's own interests first, then the most common ones among these people.
+  const interests = useMemo(() => {
+    const counts = new Map();
+    matchingPeople.forEach(person => (person.interests || []).forEach(item => counts.set(item, (counts.get(item) || 0) + 1)));
+    const popular = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([item]) => item);
+    const mine = (profile?.interests || []).filter(item => counts.has(item));
+    return [...new Set([...mine, ...popular])].slice(0, 8);
+  }, [matchingPeople, profile?.interests]);
+  // Interest and language names never overlap, so one filter value covers both.
   const visiblePeople = filter === 'All' ? matchingPeople
     : filter === 'Online' ? onlinePeople
-      : matchingPeople.filter(person => person.languages?.includes(filter));
+      : matchingPeople.filter(person => person.languages?.includes(filter) || person.interests?.includes(filter));
 
   const startCall = (person, type) => navigation.navigate(type === 'video' ? 'VideoRoom' : 'AudioRoom', {
     person, currentUser: profile, callType: type, isDemo: isDemo(person), availablePeople: onlinePeople,
@@ -160,17 +185,25 @@ export default function ConnectScreen({ navigation }) {
 
     <FavouritesStrip onCall={person => startCall(person, 'audio')} style={styles.favourites} />
 
+    {recentCalls.length > 0 && <View style={styles.recent}>
+      <View style={styles.recentHeader}>
+        <Text style={styles.recentTitle}>Recent</Text>
+        <Pressable accessibilityRole="button" onPress={() => navigation.navigate('RecentCalls')} hitSlop={8}><Text style={styles.seeAll}>See all</Text></Pressable>
+      </View>
+      {recentCalls.map(call => <RecentCallRow key={call._id} call={call} onCall={startCall} onOpen={person => navigation.navigate('UserProfile', { userId: person._id, person })} />)}
+    </View>}
+
     <View style={styles.quickRow}>
       <QuickConnect type="audio" disabled={loading} onPress={() => callRandom('audio')} />
       <QuickConnect type="video" disabled={loading} onPress={() => callRandom('video')} />
     </View>
 
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipsScroll}>
-      {['All', 'Online', ...languages].map(item => {
+      {['All', 'Online', ...languages, ...interests].map(item => {
         const active = item === filter;
         return <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={() => setFilter(item)} style={[styles.chip, active && styles.chipActive]}>
           {active && <Gradient from="#A447FA" to="#5916E6" radius={16} />}
-          <Text style={[styles.chipText, active && styles.chipTextActive]}>{item === 'Online' ? 'Online now' : item}</Text>
+          <Text style={[styles.chipText, active && styles.chipTextActive]}>{item === 'Online' ? 'Online now' : interests.includes(item) ? `${interestEmoji(item)} ${item}` : item}</Text>
         </Pressable>;
       })}
     </ScrollView>
@@ -181,7 +214,7 @@ export default function ConnectScreen({ navigation }) {
     <FlatList
       data={loading ? [] : visiblePeople}
       keyExtractor={keyOf}
-      renderItem={({ item }) => <PersonRow person={item} onCall={startCall} />}
+      renderItem={({ item }) => <PersonRow person={item} onCall={startCall} onOpen={person => navigation.navigate('UserProfile', { userId: person._id, person })} myInterests={profile?.interests || []} />}
       ListHeaderComponent={header}
       ListEmptyComponent={loading
         ? <View style={styles.loading}><ActivityIndicator size="large" color="#B254FF" /></View>
@@ -227,6 +260,10 @@ const styles = StyleSheet.create({
   onlinePillText: { fontFamily: 'Poppins-Medium', color: '#B9F8DF', fontSize: 11 },
   quickRow: { flexDirection: 'row', gap: 12 },
   favourites: { paddingHorizontal: 3, marginBottom: 18 },
+  recent: { marginBottom: 10 },
+  recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 3, marginBottom: 10 },
+  recentTitle: { color: '#FFFFFF', fontFamily: 'Poppins-SemiBold', fontSize: 17 },
+  seeAll: { color: '#B37AFF', fontFamily: 'Poppins-Medium', fontSize: 12 },
   quick: { flex: 1, minHeight: 128, borderRadius: 20, padding: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(196,181,253,0.28)' },
   quickIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   quickIconAudio: { backgroundColor: 'rgba(94,231,255,0.28)' },
@@ -252,6 +289,8 @@ const styles = StyleSheet.create({
   rowStatus: { fontFamily: 'Poppins-Medium', color: '#5EF2B5', fontSize: 10 },
   rowStatusAway: { color: '#F5C542' },
   rowTags: { flexDirection: 'row', gap: 5, marginTop: 5 },
+  rowInterests: { marginTop: 6 },
+  rowOpen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
   rowTag: { paddingHorizontal: 8, height: 20, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center' },
   rowTagText: { fontFamily: 'Poppins-Medium', color: '#E3D5FF', fontSize: 9 },
   callButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

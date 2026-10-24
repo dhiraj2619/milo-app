@@ -5,6 +5,7 @@ import { Phone, PhoneOff, Video } from 'lucide-react-native';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
 import { useCall } from '../../call/CallProvider';
 import { styles } from './callRoomUi';
+import { InterestChips, PromptCard } from '../../components/profile/Interests';
 
 const LEAVE_AFTER_END_MS = 1200;
 
@@ -72,6 +73,12 @@ export default function IncomingCallScreen({ navigation }) {
             <Text style={styles.callingText}>
               {isRinging ? `Incoming ${isVideo ? 'video' : 'audio'} call...` : endedText}
             </Text>
+            {isRinging && (peer.interests?.length > 0 || peer.prompts?.length > 0) && (
+              <View style={incomingStyles.starters}>
+                <InterestChips interests={peer.interests} max={4} small />
+                {peer.prompts?.[0] && <View style={incomingStyles.prompt}><PromptCard prompt={peer.prompts[0]} compact /></View>}
+              </View>
+            )}
           </View>
         </View>
         <View style={incomingStyles.actions}>
@@ -94,6 +101,8 @@ function ActionButton({ label, color, icon, disabled, onPress }) {
 
 const incomingStyles = StyleSheet.create({
   actions: { flexDirection: 'row', justifyContent: 'space-evenly', marginBottom: 40 },
+  starters: { width: '100%', maxWidth: 340, alignItems: 'center', marginTop: 18, gap: 10 },
+  prompt: { alignSelf: 'stretch' },
   action: { alignItems: 'center' },
   actionCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.7, shadowRadius: 14, elevation: 8 },
   actionLabel: { color: '#ede9fe', fontSize: 13, fontWeight: '600', marginTop: 10 },

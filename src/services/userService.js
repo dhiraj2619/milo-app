@@ -84,8 +84,33 @@ export async function getFavourites() {
   return response.data?.data?.favourites || [];
 }
 
+// Resolves to {favourite, mutual}; mutual means they had already favourited you too.
 export async function setFavourite(userId, favourite) {
   const request = {headers: {Authorization: `Bearer ${await token()}`}};
-  await (favourite ? api.put(`/users/me/favourites/${userId}`, null, request) : api.delete(`/users/me/favourites/${userId}`, request));
-  return favourite;
+  const response = await (favourite ? api.put(`/users/me/favourites/${userId}`, null, request) : api.delete(`/users/me/favourites/${userId}`, request));
+  return {favourite, mutual: Boolean(response.data?.data?.mutual)};
+}
+
+// Gift catalog and profile choices from the server, loaded once per app session.
+let optionsRequest = null;
+export function getProfileOptions() {
+  if (!optionsRequest) {
+    optionsRequest = api.get('/users/options').then(response => response.data.data).catch(error => {
+      optionsRequest = null;
+      throw error;
+    });
+  }
+  return optionsRequest;
+}
+
+// Someone else's profile. Opening it records a profile view for them ("Who viewed you").
+export async function getPublicProfile(userId) {
+  const response = await api.get(`/users/${userId}/profile`, {headers: {Authorization: `Bearer ${await token()}`}});
+  return response.data.data;
+}
+
+// Your call history, newest first. Pass the previous page's nextBefore to load older calls.
+export async function getMyCalls({before} = {}) {
+  const response = await api.get('/users/me/calls', {headers: {Authorization: `Bearer ${await token()}`}, params: before ? {before} : {}});
+  return response.data.data;
 }
