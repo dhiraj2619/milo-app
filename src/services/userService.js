@@ -56,10 +56,36 @@ export async function updateMyProfile(profile) {
 export async function uploadProfilePhoto(asset) {
   const formData = new FormData();
   formData.append('photo', {uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'profile.jpg'});
-  const response = await api.post('/users/me/photo', formData, {
-    headers: {Authorization: `Bearer ${await token()}`, 'Content-Type': 'multipart/form-data'},
+  // fetch sets the multipart boundary itself; axios does not do this reliably for React Native uploads.
+  const response = await fetch(`${api.defaults.baseURL}/users/me/photo`, {
+    method: 'POST',
+    headers: {Authorization: `Bearer ${await token()}`, Accept: 'application/json'},
+    body: formData,
   });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw Object.assign(new Error(body?.message || 'Could not upload your photo. Please try again.'), {response: {data: body}});
+  }
+  const updatedProfile = responseProfile({data: body});
+  if (updatedProfile) await saveSessionProfile(updatedProfile);
+  return updatedProfile;
+}
+// Back to the avatar: removes the uploaded profile photo.
+export async function removeProfilePhoto() {
+  const response = await api.delete('/users/me/photo', {headers: {Authorization: `Bearer ${await token()}`}});
   const updatedProfile = responseProfile(response);
   if (updatedProfile) await saveSessionProfile(updatedProfile);
   return updatedProfile;
+}
+
+// People saved after a good call, online first.
+export async function getFavourites() {
+  const response = await api.get('/users/me/favourites', {headers: {Authorization: `Bearer ${await token()}`}});
+  return response.data?.data?.favourites || [];
+}
+
+export async function setFavourite(userId, favourite) {
+  const request = {headers: {Authorization: `Bearer ${await token()}`}};
+  await (favourite ? api.put(`/users/me/favourites/${userId}`, null, request) : api.delete(`/users/me/favourites/${userId}`, request));
+  return favourite;
 }

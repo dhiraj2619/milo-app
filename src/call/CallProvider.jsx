@@ -4,6 +4,7 @@ import { RTCIceCandidate, RTCPeerConnection, RTCSessionDescription } from 'react
 import { disconnectSocket, getSocket } from '../services/socketService';
 import { navigateToMain } from '../navigation/navigationRef';
 import { getLocalStream, requestCallPermissions, stopStream } from './media';
+import { registerForPush } from '../services/pushService';
 
 // Call lifecycle:
 //   outgoing: idle -> starting -> ringing -> connecting -> connected -> ended
@@ -18,6 +19,8 @@ const IDLE_CALL = {
   callId: null,
   callType: null,
   peer: null,
+  // 'ringing' once the callee's phone shows the call, 'calling' while they only have a push notification.
+  delivery: null,
   endReason: null,
   connectedAt: null,
   remoteMedia: { muted: false, cameraOff: false },
@@ -27,7 +30,7 @@ const DEFAULT_CONTROLS = { muted: false, cameraOff: false, speaker: false };
 const CallContext = createContext(null);
 export const useCall = () => useContext(CallContext);
 
-export default function CallProvider({ enabled, children }) {
+export default function CallProvider({ enabled, onIncomingCall, children }) {
   const [call, setCall] = useState(IDLE_CALL);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -147,7 +150,7 @@ export default function CallProvider({ enabled, children }) {
       if (error) return finish('network');
       if (!ack?.ok) return finish(ack?.reason || 'error');
       iceServersRef.current = ack.iceServers || [];
-      updateCall({ status: 'ringing', callId: ack.callId, peer: { ...person, ...ack.callee } });
+      updateCall({ status: 'ringing', callId: ack.callId, delivery: ack.delivery || 'ringing', peer: { ...person, ...ack.callee } });
     });
   }, [finish, prepareLocalMedia, updateCall, updateControls]);
 
@@ -222,6 +225,7 @@ export default function CallProvider({ enabled, children }) {
       iceServersRef.current = iceServers || [];
       updateCall({ ...IDLE_CALL, status: 'incoming', direction: 'incoming', callId, callType, peer: caller });
       InCallManager.startRingtone('_DEFAULT_');
+      onIncomingCall?.();
       navigateToMain('IncomingCall');
     },
     accepted: async ({ callId }) => {
@@ -256,6 +260,10 @@ export default function CallProvider({ enabled, children }) {
         console.warn('Call signaling failed:', error?.message || error);
       }
     },
+    // The callee opened the app from the notification, so their phone is now ringing.
+    ringing: ({ callId }) => {
+      if (callId === callRef.current.callId && callRef.current.status === 'ringing') updateCall({ delivery: 'ringing' });
+    },
     ended: ({ callId, reason }) => {
       if (callId === callRef.current.callId) finish(reason);
     },
@@ -268,10 +276,13 @@ export default function CallProvider({ enabled, children }) {
       'call:incoming': payload => handlersRef.current.incoming(payload),
       'call:accepted': payload => handlersRef.current.accepted(payload).catch(() => finish('failed')),
       'call:signal': payload => handlersRef.current.signal(payload),
+      'call:ringing': payload => handlersRef.current.ringing(payload),
       'call:ended': payload => handlersRef.current.ended(payload),
     };
     Object.entries(events).forEach(([event, handler]) => socket.on(event, handler));
+    const stopPush = registerForPush();
     return () => {
+      stopPush();
       Object.entries(events).forEach(([event, handler]) => socket.off(event, handler));
       // Signed out: hang up and close the shared connection.
       finish('ended');

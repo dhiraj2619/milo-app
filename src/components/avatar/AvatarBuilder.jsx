@@ -1,13 +1,13 @@
 import React, {useState} from 'react';
-import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import {Camera, Check, ImagePlus, ScanFace, Shuffle} from 'lucide-react-native';
+import {ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Camera, Check, ImagePlus, ScanFace, Shuffle, UserRoundCheck} from 'lucide-react-native';
 import ProfileAvatar from '../home/ProfileAvatar';
 import {
   BACKGROUNDS, BROWS, EYES, FACIAL_HAIR, GLASSES, HAIR_COLORS, HEADWEAR_COLORS, IRIS_COLORS, LIP_COLORS,
   MOUTHS, OUTFITS, OUTFIT_COLORS, SKIN_TONES, generateAvatar, hairStylesFor,
 } from './avatarConfig';
 import {detectSkinTone} from './faceTone';
+import {pickPhoto} from '../../services/photoPicker';
 
 const TABS = [
   {key: 'skin', label: 'Skin tone'},
@@ -20,7 +20,6 @@ const TABS = [
   {key: 'outfit', label: 'Outfit'},
   {key: 'background', label: 'Background'},
 ];
-const PICKER = {mediaType: 'photo', includeBase64: true, maxWidth: 240, maxHeight: 240, quality: 0.8};
 
 function Swatches({colors, selected, onSelect}) {
   return <View style={styles.swatches}>{colors.map(item => {
@@ -47,10 +46,12 @@ const SubTitle = ({children}) => <Text style={styles.subTitle}>{children}</Text>
 
 // Lets users build an avatar that resembles them: match skin tone from a selfie,
 // then fine-tune hair, eyes, brows, lips, beard, glasses and outfit.
-export default function AvatarBuilder({value, onChange, gender, showPreview = true}) {
+// With onUsePhoto, the same selfie can also become the profile photo (it is only uploaded then).
+export default function AvatarBuilder({value, onChange, gender, showPreview = true, onUsePhoto, photoUri}) {
   const [tab, setTab] = useState('skin');
   const [matching, setMatching] = useState(false);
   const [status, setStatus] = useState(null);
+  const [selfie, setSelfie] = useState(null);
   const tabs = TABS.filter(item => item.hideFor !== gender);
   const hairStyles = hairStylesFor(gender);
   const headwear = hairStyles.find(item => item.value === value.top)?.headwear;
@@ -59,22 +60,17 @@ export default function AvatarBuilder({value, onChange, gender, showPreview = tr
 
   const matchFace = async source => {
     setStatus(null);
-    let result;
-    try {
-      result = source === 'camera' ? await launchCamera({...PICKER, cameraType: 'front', saveToPhotos: false}) : await launchImageLibrary({...PICKER, selectionLimit: 1});
-    } catch (_) {
-      setStatus({error: true, text: 'Could not open the camera. Try choosing a photo instead.'});
+    const result = await pickPhoto(source, {base64: true});
+    if (result.cancelled) return;
+    if (result.error) {
+      setStatus({error: true, text: result.error, openSettings: result.openSettings});
       return;
     }
-    if (result.didCancel) return;
-    if (result.errorCode) {
-      setStatus({error: true, text: result.errorCode === 'camera_unavailable' ? 'No camera found. Choose a photo instead.' : result.errorCode === 'permission' ? 'Camera permission is off. Allow it in Settings or choose a photo.' : 'Could not read that photo. Please try another one.'});
-      return;
-    }
+    setSelfie(result.asset);
     setMatching(true);
     // Let the spinner render before decoding the image on the JS thread.
     await new Promise(resolve => setTimeout(resolve, 30));
-    const tone = result.assets?.[0]?.base64 ? detectSkinTone(result.assets[0].base64) : null;
+    const tone = result.asset.base64 ? detectSkinTone(result.asset.base64) : null;
     setMatching(false);
     if (!tone) {
       setStatus({error: true, text: 'We couldn’t see your face clearly. Use a well-lit selfie with your face in the centre.'});
@@ -113,13 +109,20 @@ export default function AvatarBuilder({value, onChange, gender, showPreview = tr
     </View> : <Pressable accessibilityRole="button" onPress={shuffle} style={styles.shuffleRow}><Shuffle size={16} color="#C77CFF" /><Text style={styles.shuffleText}>Try a random look</Text></Pressable>}
 
     <View style={styles.matchCard}>
-      <View style={styles.matchHeader}><View style={styles.matchIcon}><ScanFace size={22} color="#E4C4FF" /></View><View style={styles.matchCopy}><Text style={styles.matchTitle}>Match my skin tone</Text><Text style={styles.matchHint}>Take a selfie in good light. It is only read on your phone and is not uploaded.</Text></View></View>
+      <View style={styles.matchHeader}><View style={styles.matchIcon}><ScanFace size={22} color="#E4C4FF" /></View><View style={styles.matchCopy}><Text style={styles.matchTitle}>Match my skin tone</Text><Text style={styles.matchHint}>{onUsePhoto ? 'Take a selfie in good light. It is read on your phone, and only uploaded if you use it as your profile photo.' : 'Take a selfie in good light. It is only read on your phone and is not uploaded.'}</Text></View></View>
       <View style={styles.matchButtons}>
         <Pressable disabled={matching} onPress={() => matchFace('camera')} style={[styles.matchButton, styles.matchPrimary]}><Camera size={17} color="#FFF" /><Text style={styles.matchButtonText}>Take selfie</Text></Pressable>
         <Pressable disabled={matching} onPress={() => matchFace('library')} style={styles.matchButton}><ImagePlus size={17} color="#E4C4FF" /><Text style={styles.matchButtonText}>Choose photo</Text></Pressable>
       </View>
       {matching && <View style={styles.statusRow}><ActivityIndicator size="small" color="#C77CFF" /><Text style={styles.statusText}>Reading your skin tone…</Text></View>}
       {!!status && !matching && <Text style={[styles.statusText, status.error && styles.statusError]}>{status.text}</Text>}
+      {!!status?.openSettings && !matching && <Pressable onPress={status.openSettings}><Text style={styles.settingsLink}>Open Settings</Text></Pressable>}
+      {!!onUsePhoto && !!selfie && !matching && <View style={styles.selfieRow}>
+        <Image source={{uri: selfie.uri}} style={styles.selfieThumb} />
+        {photoUri === selfie.uri
+          ? <View style={styles.selfieUsed}><UserRoundCheck size={16} color="#A7F3D0" /><Text style={styles.selfieUsedText}>Using this as your profile photo</Text></View>
+          : <Pressable accessibilityRole="button" onPress={() => onUsePhoto(selfie)} style={styles.selfieButton}><Text style={styles.matchButtonText}>Use as my profile photo</Text></Pressable>}
+      </View>}
     </View>
 
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{tabs.map(item => <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tab, tab === item.key && styles.tabActive]}><Text style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{item.label}</Text></Pressable>)}</ScrollView>
@@ -146,6 +149,12 @@ const styles = StyleSheet.create({
   statusRow: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10},
   statusText: {color: '#A7F3D0', fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 17, marginTop: 10},
   statusError: {color: '#FF9AAF'},
+  settingsLink: {color: '#D9B3FF', fontFamily: 'Poppins-Medium', fontSize: 12.5, marginTop: 6, textDecorationLine: 'underline'},
+  selfieRow: {flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#2E2348'},
+  selfieThumb: {width: 46, height: 46, borderRadius: 23, backgroundColor: '#211933'},
+  selfieButton: {flex: 1, minHeight: 40, borderRadius: 12, borderWidth: 1, borderColor: '#8B40EE', alignItems: 'center', justifyContent: 'center'},
+  selfieUsed: {flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8},
+  selfieUsedText: {color: '#A7F3D0', fontFamily: 'Poppins-Medium', fontSize: 12.5},
   tabs: {gap: 8, paddingTop: 18, paddingBottom: 4},
   tab: {paddingHorizontal: 14, height: 36, borderRadius: 18, borderWidth: 1, borderColor: '#38323F', backgroundColor: '#191820', justifyContent: 'center'},
   tabActive: {borderColor: '#9957FF', backgroundColor: '#2A1A4A'},

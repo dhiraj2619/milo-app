@@ -8,6 +8,7 @@ import {
 } from '@react-native-firebase/auth';
 import api from './api';
 import {clearSessionProfile, saveSessionProfile} from './sessionService';
+import {unregisterFromPush} from './pushService';
 
 let pendingConfirmation = null;
 let pendingPhone = null;
@@ -81,6 +82,7 @@ export async function verifyPhoneOTP(otp, phone) {
 export async function logout() {
   pendingConfirmation = null;
   pendingPhone = null;
+  await unregisterFromPush();
   await signOut(getAuth());
   await clearSessionProfile();
 }

@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RTCView } from 'react-native-webrtc';
-import { ArrowLeft, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, SwitchCamera, Video, VideoOff, Volume2, VolumeX } from 'lucide-react-native';
+import { ArrowLeft, Heart, Mic, MicOff, MoreHorizontal, Phone, PhoneOff, SwitchCamera, Video, VideoOff, Volume2, VolumeX } from 'lucide-react-native';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
-import { getMyProfile } from '../../services/userService';
+import { getFavourites, getMyProfile, setFavourite as saveFavourite } from '../../services/userService';
 import { useCall } from '../../call/CallProvider';
 import { Control, formatDuration, styles } from './callRoomUi';
 
@@ -36,6 +36,8 @@ export default function LiveCallRoom({ navigation, route }) {
   const [elapsed, setElapsed] = useState(0);
   const [frontCamera, setFrontCamera] = useState(true);
   const joinedRef = useRef(false);
+  const endedRef = useRef(null);
+  const [favourite, setFavourite] = useState(false);
 
   useEffect(() => {
     if (!incomingCallId) startCall(route.params?.person, callType);
@@ -56,17 +58,37 @@ export default function LiveCallRoom({ navigation, route }) {
   // A previous call may still be showing "ended" when this screen opens, so
   // only leave once this screen has seen its own call in progress.
   if (!['idle', 'ended'].includes(call.status)) joinedRef.current = true;
-  const peerId = call.peer?._id || route.params?.person?._id;
+  // The provider resets an ended call to idle after a moment; keep how this one ended for the end screen.
+  if (call.status === 'ended' && joinedRef.current && !endedRef.current) {
+    endedRef.current = { reason: call.endReason, peer: call.peer, talkedSeconds: call.connectedAt ? Math.round((Date.now() - call.connectedAt) / 1000) : 0 };
+  }
+  const ended = endedRef.current;
+  const peerId = call.peer?._id || ended?.peer?._id || route.params?.person?._id;
   const suggestions = (Array.isArray(route.params?.availablePeople) ? route.params.availablePeople : [])
     .filter(person => person?._id && person._id !== peerId)
     .slice(0, MAX_SUGGESTIONS);
-  const showSuggestions = call.status === 'ended' && joinedRef.current && UNREACHABLE_REASONS.includes(call.endReason) && suggestions.length > 0;
+  const showSuggestions = !!ended && UNREACHABLE_REASONS.includes(ended.reason) && suggestions.length > 0;
+  // A call that actually connected: offer to favourite and call again instead of leaving.
+  const showAfterCall = !!ended && ended.talkedSeconds > 0 && !String(peerId || '').startsWith('demo-');
 
   useEffect(() => {
-    if (call.status !== 'ended' || !joinedRef.current || showSuggestions) return undefined;
+    if (!ended || showSuggestions || showAfterCall) return undefined;
     const timer = setTimeout(() => { if (navigation.canGoBack()) navigation.goBack(); }, LEAVE_AFTER_END_MS);
     return () => clearTimeout(timer);
-  }, [call.status, navigation, showSuggestions]);
+  }, [ended, navigation, showSuggestions, showAfterCall]);
+
+  useEffect(() => {
+    if (!showAfterCall) return undefined;
+    let active = true;
+    getFavourites().then(list => { if (active) setFavourite(list.some(person => person._id === peerId)); }).catch(() => { });
+    return () => { active = false; };
+  }, [peerId, showAfterCall]);
+
+  const toggleFavourite = () => {
+    const next = !favourite;
+    setFavourite(next);
+    saveFavourite(peerId, next).catch(() => setFavourite(!next));
+  };
 
   // Restart this screen with the new person so the call state starts fresh.
   const callSomeoneElse = person => navigation.replace(route.name, { ...route.params, person, incomingCallId: undefined });
@@ -80,13 +102,14 @@ export default function LiveCallRoom({ navigation, route }) {
   }, [call.connectedAt]);
 
   const isConnected = call.status === 'connected';
-  const isEnded = call.status === 'ended' && joinedRef.current;
-  const peer = call.peer || route.params?.person || {};
+  const isEnded = !!ended;
+  const peer = call.peer || ended?.peer || route.params?.person || {};
   const peerName = peer.nickname || peer.name || 'MILO member';
   const selfName = self?.nickname || self?.name || 'You';
-  const statusText = isEnded ? endedText(call.endReason, peerName) : ({
+  const statusText = isEnded ? (showAfterCall ? `You talked for ${formatDuration(ended.talkedSeconds)}` : endedText(ended.reason, peerName)) : ({
     starting: `Calling ${peerName}...`,
-    ringing: 'Ringing...',
+    // "Calling" until the other phone actually shows the call (it may only have a notification so far).
+    ringing: call.delivery === 'calling' ? `Calling ${peerName}...` : 'Ringing...',
     connecting: 'Connecting...',
   }[call.status] || `Calling ${peerName}...`);
   const pillText = isConnected ? formatDuration(elapsed) : (isEnded ? 'Ended' : 'Connecting');
@@ -160,9 +183,26 @@ export default function LiveCallRoom({ navigation, route }) {
                 <Text style={styles.callingText}>{statusText}</Text>
               )}
             </View>
-            {showSuggestions ? (
+            {showSuggestions || showAfterCall ? (
               <View style={liveStyles.suggestions}>
-                <Text style={liveStyles.suggestionsTitle}>Talk to someone else</Text>
+                {showAfterCall && (
+                  <View style={liveStyles.afterCall}>
+                    <Pressable accessibilityRole="button" accessibilityState={{ selected: favourite }} accessibilityLabel={favourite ? `Remove ${peerName} from favourites` : `Add ${peerName} to favourites`} onPress={toggleFavourite} style={({ pressed }) => [liveStyles.afterButton, favourite && liveStyles.afterButtonOn, pressed && styles.pressed]}>
+                      <Heart color={favourite ? '#ff6fa8' : '#fff'} fill={favourite ? '#ff6fa8' : 'none'} size={18} />
+                      <Text style={liveStyles.afterButtonText}>{favourite ? 'In favourites' : 'Add to favourites'}</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Call ${peerName} again`} onPress={() => callSomeoneElse(peer)} style={({ pressed }) => [liveStyles.afterButton, liveStyles.afterButtonPrimary, pressed && styles.pressed]}>
+                      {isVideo ? <Video color="#fff" size={18} /> : <Phone color="#fff" size={17} fill="#fff" />}
+                      <Text style={liveStyles.afterButtonText}>Call again</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {showAfterCall && (
+                  <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} hitSlop={8} style={liveStyles.doneLink}>
+                    <Text style={liveStyles.doneText}>Done</Text>
+                  </Pressable>
+                )}
+                {suggestions.length > 0 && <Text style={liveStyles.suggestionsTitle}>Talk to someone else</Text>}
                 <ScrollView style={liveStyles.suggestionsList} showsVerticalScrollIndicator={false}>
                   {suggestions.map(person => {
                     const name = person.nickname || person.name || 'MILO member';
@@ -208,7 +248,7 @@ export default function LiveCallRoom({ navigation, route }) {
           {isVideo ? (
             <Control icon={controls.cameraOff ? <VideoOff color="#fff" size={21} /> : <Video color="#f7f4ff" size={21} />} label={controls.cameraOff ? 'Camera on' : 'Camera'} active={controls.cameraOff} disabled={isEnded} onPress={toggleCamera} />
           ) : speakerControl}
-          <Pressable accessibilityRole="button" accessibilityLabel="End call" disabled={isEnded} style={({ pressed }) => [styles.endButton, pressed && styles.pressed]} onPress={() => navigation.goBack()}>
+          <Pressable accessibilityRole="button" accessibilityLabel="End call" disabled={isEnded} style={({ pressed }) => [styles.endButton, pressed && styles.pressed]} onPress={() => (isConnected ? endCall() : navigation.goBack())}>
             <PhoneOff color="#fff" size={26} />
           </Pressable>
           {isVideo ? (
@@ -227,6 +267,13 @@ const liveStyles = StyleSheet.create({
   selfBlockSpacing: { marginTop: 44 },
   suggestions: { width: '100%', maxWidth: 360, marginTop: 28 },
   suggestionsTitle: { color: '#ede9fe', fontSize: 14, fontWeight: '700', marginBottom: 10, marginLeft: 4 },
+  afterCall: { flexDirection: 'row', gap: 10 },
+  afterButton: { flex: 1, height: 50, borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(18,4,54,0.72)', borderWidth: 1, borderColor: 'rgba(137,77,201,0.5)' },
+  afterButtonOn: { borderColor: '#ff6fa8', backgroundColor: 'rgba(255,111,168,0.14)' },
+  afterButtonPrimary: { backgroundColor: '#a855f7', borderColor: '#a855f7' },
+  afterButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  doneLink: { alignSelf: 'center', paddingVertical: 12, marginBottom: 8 },
+  doneText: { color: '#c4b5fd', fontSize: 14, fontWeight: '600' },
   suggestionsList: { maxHeight: 264 },
   suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginBottom: 8, borderRadius: 18, backgroundColor: 'rgba(18,4,54,0.72)', borderWidth: 1, borderColor: 'rgba(137,77,201,0.32)' },
   suggestionAvatar: { width: 44, height: 44 },

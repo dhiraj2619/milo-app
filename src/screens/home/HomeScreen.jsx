@@ -20,6 +20,7 @@ import {
   Clock3,
   MoreHorizontal,
   House,
+  Pencil,
   MapPin,
   MessageCircle,
   Phone,
@@ -33,12 +34,13 @@ import {
 import { Gradient, Coin, Gift } from '../../components/home/HomeDecor';
 import MiloConnectModal from '../../components/subscription/MiloConnectModal';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
+import FavouritesStrip from '../../components/favourites/FavouritesStrip';
 import { CoinFlight, CountUpBalance } from '../../components/home/CoinClaimAnimation';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
 import { claimDailyCoins, getWallet } from '../../services/coinService';
 import { getConversations } from '../../services/chatService';
-import { consumeWelcomeReward, getDailyClaimAt, saveDailyClaimAt } from '../../services/sessionService';
+import { consumeWelcomeReward, getDailyClaimAt, getSessionProfile, saveDailyClaimAt } from '../../services/sessionService';
 import { getAuth } from '@react-native-firebase/auth';
 import { getSocket } from '../../services/socketService';
 
@@ -351,6 +353,15 @@ export default function HomeScreen({ navigation }) {
     }).catch(() => { });
     return () => { active = false; };
   }, []);
+  // Coming back from the profile screen: pick up a new photo or avatar from the saved session profile.
+  React.useEffect(() => navigation.addListener('focus', () => {
+    getSessionProfile().then(saved => {
+      if (!saved) return;
+      setProfile(current => current && current.firebaseUid === saved.firebaseUid
+        ? { ...current, photoUrl: saved.photoUrl ?? null, avatarStyle: saved.avatarStyle, avatarSeed: saved.avatarSeed }
+        : current);
+    }).catch(() => { });
+  }), [navigation]);
   React.useEffect(() => {
     let mounted = true;
     getConversations()
@@ -516,7 +527,13 @@ export default function HomeScreen({ navigation }) {
       >
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="Open profile" onPress={openDrawer} style={styles.headerProfile}>
-            <View style={styles.headerAvatar}><ProfileAvatar {...userAvatar} photoUrl={profile?.photoUrl} /><View style={styles.headerOnline} /></View>
+            <View>
+              <View style={styles.headerAvatar}><ProfileAvatar {...userAvatar} photoUrl={profile?.photoUrl} /><View style={styles.headerOnline} /></View>
+              {/* Straight to the avatar editor and photo upload. */}
+              <Pressable accessibilityRole="button" accessibilityLabel="Edit avatar or photo" hitSlop={10} onPress={() => navigation.navigate('Profile', { section: 'avatar' })} style={styles.headerEdit}>
+                <Pencil size={11} color="#FFFFFF" strokeWidth={2.6} />
+              </Pressable>
+            </View>
             <View><Text numberOfLines={1} style={styles.headerName}>{profile?.nickname || 'My Profile'}</Text><Text style={styles.tagline}>View profile</Text></View>
           </Pressable>
           <View style={styles.headerActions}>
@@ -583,6 +600,8 @@ export default function HomeScreen({ navigation }) {
             </Pressable>
           ))}
         </View>
+
+        <FavouritesStrip onCall={joinCall} style={styles.favourites} />
 
         {filter === 'Online' ? <><View style={styles.onlineSectionHeader}><View><Text style={styles.onlineSectionTitle}>MILO Connect</Text><Text style={styles.onlineSectionSubtitle}>People online right now</Text></View><View style={styles.onlineCount}><Text style={styles.onlineCountText}>{visiblePeople.length} people online</Text><View style={styles.onlineCountDot} /></View></View><View style={styles.onlineProfileList}>{visiblePeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !visiblePeople.length && <Text style={styles.miloChatEmpty}>No registered members are online yet.</Text>}</> : filter === 'Nearby' ? (hasMiloConnect ? <><View style={styles.nearbyHeader}><View><Text style={styles.nearbyTitle}>Nearby</Text><Text style={styles.nearbySubtitle}>Find people in {nearbyCity}</Text></View><View style={styles.cityPill}><MapPin size={13} color="#E5CBFF" /><Text style={styles.cityPillText}>{nearbyCity}</Text><ChevronRight size={13} color="#E5CBFF" /></View></View><NearbyRadar profile={profile} people={nearbyPeople.slice(0, 7)} city={nearbyCity} wave={nearbyWave} /><View style={styles.nearbyCountCard}><View style={styles.nearbyCountIcon}><UserRound size={18} color="#BC76FF" /></View><View><Text style={styles.nearbyCountTitle}>{nearbyPeople.length} people nearby</Text><Text style={styles.nearbyCountSubtitle}>in {nearbyCity}</Text></View><ChevronRight size={18} color="#B96DFF" /></View><Text style={styles.peopleNearbyTitle}>People Nearby</Text><View style={styles.onlineProfileList}>{nearbyPeople.map(person => <OnlineProfileRow key={person._id || person.firebaseUid} person={person} onPress={joinCall} />)}</View>{!loadingPeople && !matchingPeople.length && <Text style={styles.miloChatEmpty}>No nearby members are available yet.</Text>}</> : <NearbyUpgrade onUpgrade={() => setMiloConnectOpen(true)} />) : <><SectionTitle title="MILO Connect" subtitle="Real people. Real conversations." />
           <FlatList
@@ -702,6 +721,7 @@ const styles = StyleSheet.create({
   headerProfile: { flexDirection: 'row', alignItems: 'center', gap: 10, maxWidth: '54%' },
   headerAvatar: { width: 47, height: 47, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: '#25E989' },
   headerOnline: { position: 'absolute', right: 0, bottom: 0, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#0B0D20', backgroundColor: '#25E989' },
+  headerEdit: { position: 'absolute', right: -5, top: -4, width: 21, height: 21, borderRadius: 11, borderWidth: 2, borderColor: '#0B0D20', backgroundColor: '#8B40EE', alignItems: 'center', justifyContent: 'center' },
   headerName: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#FFF9FF' },
   tagline: { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#C9C3D8' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
@@ -815,6 +835,7 @@ dailySheetOverlay: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(
   selectedFilterLabel: { color: '#FFFFFF' },
   selectedFilterDot: { backgroundColor: '#FFFFFF' },
   sectionHeading: { marginTop: 18, marginBottom: 9 },
+  favourites: { marginTop: 18 },
   sectionLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: {
     fontFamily: 'Poppins-SemiBold',

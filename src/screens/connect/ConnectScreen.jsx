@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, ScrollVi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { House, MessageCircle, Phone, Plus, Shuffle, Sparkles, UserRound, Users, Video } from 'lucide-react-native';
 import ProfileAvatar from '../../components/home/ProfileAvatar';
+import FavouritesStrip from '../../components/favourites/FavouritesStrip';
 import { Coin, Gradient } from '../../components/home/HomeDecor';
 import { useToast } from '../../components/ui/ToastProvider';
 import { getDiscoverProfiles, getMyProfile } from '../../services/userService';
@@ -157,6 +158,8 @@ export default function ConnectScreen({ navigation }) {
       <Text style={styles.subtitle}>Start an audio or video call right now</Text>
     </View>
 
+    <FavouritesStrip onCall={person => startCall(person, 'audio')} style={styles.favourites} />
+
     <View style={styles.quickRow}>
       <QuickConnect type="audio" disabled={loading} onPress={() => callRandom('audio')} />
       <QuickConnect type="video" disabled={loading} onPress={() => callRandom('video')} />
@@ -223,6 +226,7 @@ const styles = StyleSheet.create({
   onlinePillDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#21E6A1' },
   onlinePillText: { fontFamily: 'Poppins-Medium', color: '#B9F8DF', fontSize: 11 },
   quickRow: { flexDirection: 'row', gap: 12 },
+  favourites: { paddingHorizontal: 3, marginBottom: 18 },
   quick: { flex: 1, minHeight: 128, borderRadius: 20, padding: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(196,181,253,0.28)' },
   quickIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   quickIconAudio: { backgroundColor: 'rgba(94,231,255,0.28)' },

@@ -8,7 +8,7 @@ import {getAuth} from '@react-native-firebase/auth';
 import {clearSessionProfile, getSessionProfile, saveSessionProfile} from './src/services/sessionService';
 import {getMyProfile} from './src/services/userService';
 import CallProvider from './src/call/CallProvider';
-import {navigationRef} from './src/navigation/navigationRef';
+import {flushPendingNavigation, navigationRef} from './src/navigation/navigationRef';
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -44,9 +44,10 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <ToastProvider>
-      <CallProvider enabled={sessionReady && signedIn}>
+      {/* An incoming call (e.g. the app was opened from its notification) skips the rest of the splash. */}
+      <CallProvider enabled={sessionReady && signedIn} onIncomingCall={finishSplash}>
       {showSplash || !sessionReady ? <SplashScreen onFinish={finishSplash} /> : (
-        <NavigationContainer ref={navigationRef}>
+        <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
           <RootNavigator signedIn={signedIn} onProfileCompleted={handleProfileCompleted} />
         </NavigationContainer>
       )}

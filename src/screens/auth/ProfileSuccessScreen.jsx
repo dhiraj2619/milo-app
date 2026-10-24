@@ -64,6 +64,7 @@ export default function ProfileSuccessScreen({navigation, onProfileCompleted, ro
         </Animated.View>
         <Text accessibilityRole="header" style={styles.heading}>Profile created{'\n'}successfully!</Text>
         <Text style={styles.description}>You’re all set! Meet new people,{'\n'}make friends, and start connecting.</Text>
+        {route.params?.photoFailed && <Text style={styles.notice}>We couldn’t upload your profile photo. You can add it again from your profile.</Text>}
       </View>
       <AppButton title="Let’s get started" onPress={continueToHome} style={styles.button} />
     </View>
@@ -77,5 +78,6 @@ const styles = StyleSheet.create({
   artwork: {width: 260, height: 260, marginBottom: 12},
   heading: {fontFamily: 'Poppins-SemiBold', color: '#FAF7FF', fontSize: 29, lineHeight: 39, textAlign: 'center'},
   description: {fontFamily: 'Poppins-Regular', color: '#BEB5CD', fontSize: 14, lineHeight: 23, textAlign: 'center', marginTop: 18},
+  notice: {fontFamily: 'Poppins-Regular', color: '#FFB4C4', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 14},
   button: {marginTop: 24, marginBottom: 22},
 });
